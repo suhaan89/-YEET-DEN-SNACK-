@@ -111,6 +111,7 @@ local function onSlap(player: Player)
 		SnackService.ForceDrop(closest, true)
 	end
 
+	Ragdoll.SlapEffect(character :: Model, targetRoot.Position) -- Comic-Hand schwingt (Anim ohne Assets)
 	Ragdoll.Fling(targetChar, velocity, Config.RagdollTime)
 	powEffect(targetRoot.Position + Vector3.new(0, 2, 0))
 	sfxRemote:FireAllClients("slap", targetRoot.Position)
