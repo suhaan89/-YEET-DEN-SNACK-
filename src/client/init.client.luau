@@ -65,6 +65,13 @@ end);
 	SoundFx.Play(name, position)
 end);
 
+-- Shop-Gebäude betreten (ProximityPrompt) -> Server sagt uns, welches Fenster aufgeht
+(Remotes.Get("OpenShop") :: RemoteEvent).OnClientEvent:Connect(function(shopId)
+	if typeof(shopId) == "string" then
+		Ui.OpenShop(shopId)
+	end
+end);
+
 -- Fling: Server sagt "du fliegst" – wir wenden den Impuls lokal an,
 -- weil der Client die Physik seines eigenen Charakters besitzt.
 (Remotes.Get("Fling") :: RemoteEvent).OnClientEvent:Connect(function(velocity, spin)
@@ -272,7 +279,7 @@ local function runTutorial()
 		"✋ Drück E bei einem Snack zum Aufheben – aber nur 4 Sekunden halten!",
 		"🖱️ Klick HALTEN & loslassen = YEET Richtung deiner Basis (folge dem gelben Strahl!)",
 		"👋 Q = SLAP! Wer getroffen wird, lässt seinen Snack fallen...",
-		"🏦 Snacks im Tresor = Cash pro Sekunde. Kauf Upgrades im SHOP!",
+		"🏦 Snacks im Tresor = Cash pro Sekunde. Besuch die SHOPS am Plaza-Rand!",
 	}
 	for i, text in steps do
 		task.delay((i - 1) * 6, Ui.Toast, text)

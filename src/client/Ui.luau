@@ -4,8 +4,11 @@
 	- Cash-Anzeige (oben links) mit Rebirth-Multiplikator
 	- Ankündigungs-Banner (oben mitte, mit Raritäts-Farbe)
 	- Toast-Nachrichten (unten mitte)
-	- Shop (Upgrades + Sugar-Rush-Rebirth)
+	- Shop-Fenster (Upgrade/Pets/Style/Merge) – öffnen NUR über die
+	  Shop-Gebäude in der Map (Server feuert "OpenShop"), kein Button mehr!
 	- YEET-Ladebalken + Halte-Hinweis
+	- Supreme-Truck-Fortschrittsanzeige
+	- Debug-Menü (nur für Entwickler sichtbar)
 ]]
 
 local Players = game:GetService("Players")
@@ -34,6 +37,17 @@ local chargeBarFill: Frame
 local holdHint: TextLabel
 local upgradeRows: { [string]: { Level: TextLabel, Button: TextButton } } = {}
 local rebirthButton: TextButton
+
+-- Shop-Fenster-Registry: shopId -> Frame (öffnen über Ui.OpenShop)
+local shopWindows: { [string]: Frame } = {}
+
+-- Pet-/Style-Shop: Buttons pro Item + Cache des Server-Stands
+local petRows: { [string]: TextButton } = {}
+local trailRows: { [string]: TextButton } = {}
+local collectionsCache: any = { Pets = {}, EquippedPet = "", Trails = {}, EquippedTrail = "" }
+
+-- Merge-Station
+local mergeList: ScrollingFrame
 
 -- ══════════ Kleine Helfer ══════════
 
@@ -65,6 +79,48 @@ local function roundify(instance: Instance, radius: number)
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, radius)
 	corner.Parent = instance
+end
+
+-- Rotes ✕ oben rechts – seit die Shops Orte sind, braucht jedes Fenster einen Schließer
+local function addCloseButton(frame: Frame)
+	local close = Instance.new("TextButton")
+	close.Name = "Close"
+	close.AnchorPoint = Vector2.new(1, 0)
+	close.Position = UDim2.new(1, -8, 0, 8)
+	close.Size = UDim2.fromOffset(30, 30)
+	close.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	close.Font = FONT
+	close.TextScaled = true
+	close.Text = "✕"
+	close.TextColor3 = Color3.new(1, 1, 1)
+	close.ZIndex = 5
+	roundify(close, 8)
+	close.Parent = frame
+	close.Activated:Connect(function()
+		frame.Visible = false
+	end)
+end
+
+-- Zentriertes Fenster mit Titel + Schließen-Button (Grundgerüst aller Shop-UIs)
+local function makeWindow(title: string, size: Vector2, titleColor: Color3): Frame
+	local frame = Instance.new("Frame")
+	frame.Name = title
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.5)
+	frame.Size = UDim2.fromOffset(size.X, size.Y)
+	frame.BackgroundColor3 = Color3.fromRGB(35, 30, 45)
+	frame.BackgroundTransparency = 0.05
+	frame.Visible = false
+	roundify(frame, 16)
+	makeLabel(frame, {
+		Size = UDim2.new(1, -80, 0, 40),
+		Position = UDim2.fromOffset(40, 0),
+		Text = title,
+		TextColor3 = titleColor,
+	})
+	addCloseButton(frame)
+	frame.Parent = gui
+	return frame
 end
 
 -- ══════════ Cash-Anzeige ══════════
@@ -195,36 +251,9 @@ local function refreshShop()
 end
 
 local function buildShop()
-	-- Toggle-Button
-	local toggle = Instance.new("TextButton")
-	toggle.Name = "ShopToggle"
-	toggle.Position = UDim2.new(0, 12, 0, 66)
-	toggle.Size = UDim2.fromOffset(120, 40)
-	toggle.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
-	toggle.Font = FONT
-	toggle.TextScaled = true
-	toggle.Text = "🛒 SHOP"
-	toggle.TextColor3 = Color3.new(1, 1, 1)
-	roundify(toggle, 12)
-	toggle.Parent = gui
-
-	-- Shop-Fenster
-	shopFrame = Instance.new("Frame")
-	shopFrame.Name = "Shop"
-	shopFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-	shopFrame.Position = UDim2.fromScale(0.5, 0.5)
-	shopFrame.Size = UDim2.fromOffset(420, 360)
-	shopFrame.BackgroundColor3 = Color3.fromRGB(35, 30, 45)
-	shopFrame.BackgroundTransparency = 0.05
-	shopFrame.Visible = false
-	roundify(shopFrame, 16)
-	shopFrame.Parent = gui
-
-	makeLabel(shopFrame, {
-		Size = UDim2.new(1, 0, 0, 40),
-		Text = "🍫 SNACK-SHOP",
-		TextColor3 = Color3.fromRGB(255, 200, 80),
-	})
+	-- Kein Toggle-Button mehr: der Upgrade-Shop ist jetzt ein ORT auf der Map!
+	shopFrame = makeWindow("🛒 UPGRADE-SHOP", Vector2.new(420, 360), Color3.fromRGB(255, 200, 80))
+	shopWindows.Upgrade = shopFrame
 
 	local list = Instance.new("Frame")
 	list.Position = UDim2.new(0, 12, 0, 48)
@@ -312,19 +341,301 @@ local function buildShop()
 		end)
 	end)
 
-	toggle.Activated:Connect(function()
-		shopFrame.Visible = not shopFrame.Visible
-		if shopFrame.Visible then
-			refreshShop()
-		end
-	end)
-
 	-- Bei Level-/Rebirth-Änderungen aktualisieren
 	player.AttributeChanged:Connect(function()
 		if shopFrame.Visible then
 			refreshShop()
 		end
 	end)
+end
+
+-- ══════════ Pet-Shop & Style-Shop ══════════
+-- Beide zeigen Items aus Config (Pets/Trails) mit Kaufen/Ausrüsten-Buttons.
+-- Besitz & Ausrüstung kommen per GetCollections vom Server (collectionsCache).
+
+local function refreshCollectionShops()
+	task.spawn(function()
+		local ok, data = pcall(function()
+			return (Remotes.Get("GetCollections") :: RemoteFunction):InvokeServer()
+		end)
+		if not ok or typeof(data) ~= "table" then
+			return
+		end
+		collectionsCache = data
+
+		for _, def in Config.Pets do
+			local button = petRows[def.Id]
+			if button then
+				if data.EquippedPet == def.Id then
+					button.Text = "✓ AKTIV"
+					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+				elseif data.Pets and data.Pets[def.Id] then
+					button.Text = "AUSRÜSTEN"
+					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				else
+					button.Text = formatNumber(def.Cost) .. "💰"
+					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+				end
+			end
+		end
+		for _, def in Config.Trails do
+			local button = trailRows[def.Id]
+			if button then
+				if data.EquippedTrail == def.Id then
+					button.Text = "✓ AKTIV"
+					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+				elseif data.Trails and data.Trails[def.Id] then
+					button.Text = "AUSRÜSTEN"
+					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				else
+					button.Text = formatNumber(def.Cost) .. "💰"
+					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+				end
+			end
+		end
+	end)
+end
+
+-- Generischer Item-Shop (Pets ODER Trails – gleiche Mechanik, andere Remotes)
+local function buildCollectionShop(
+	shopId: string,
+	title: string,
+	titleColor: Color3,
+	items: { any },
+	rows: { [string]: TextButton },
+	buyRemoteName: string,
+	equipRemoteName: string,
+	ownedKey: string,
+	equippedKey: string
+)
+	local frame = makeWindow(title, Vector2.new(440, 90 + #items * 62), titleColor)
+	shopWindows[shopId] = frame
+
+	local list = Instance.new("Frame")
+	list.Position = UDim2.new(0, 12, 0, 48)
+	list.Size = UDim2.new(1, -24, 1, -60)
+	list.BackgroundTransparency = 1
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.Parent = list
+
+	for _, def in items do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, 0, 0, 54)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Name,
+			TextColor3 = def.Color or Color3.new(1, 1, 1),
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -140, 0, 18),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Desc or "",
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+		})
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 38)
+		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = formatNumber(def.Cost) .. "💰"
+		roundify(button, 10)
+		button.Parent = row
+		rows[def.Id] = button
+
+		button.Activated:Connect(function()
+			task.spawn(function()
+				-- Aktion aus dem Cache ableiten: besitzen? ausgerüstet? sonst kaufen.
+				local owned = collectionsCache[ownedKey] and collectionsCache[ownedKey][def.Id]
+				local remoteName, arg
+				if owned and collectionsCache[equippedKey] == def.Id then
+					remoteName, arg = equipRemoteName, "" -- ablegen
+				elseif owned then
+					remoteName, arg = equipRemoteName, def.Id
+				else
+					remoteName, arg = buyRemoteName, def.Id
+				end
+				local ok, result = pcall(function()
+					return (Remotes.Get(remoteName) :: RemoteFunction):InvokeServer(arg)
+				end)
+				if ok and result then
+					Ui.Toast((result.ok and "✅ " or "❌ ") .. result.msg)
+				end
+				refreshCollectionShops()
+			end)
+		end)
+	end
+end
+
+-- ══════════ Merge-Station ══════════
+-- Zeigt den eigenen Tresor-Inhalt gruppiert; pro Snack-Sorte Buttons für
+-- x2/x3/x5-Merges inkl. Erfolgschance. Validierung passiert auf dem Server!
+
+local MERGE_COUNTS = { 2, 3, 5 }
+
+local function refreshMerge()
+	task.spawn(function()
+		local ok, vault = pcall(function()
+			return (Remotes.Get("GetVault") :: RemoteFunction):InvokeServer()
+		end)
+		if not ok or typeof(vault) ~= "table" then
+			return
+		end
+
+		-- Nach Snack-Name gruppieren
+		local counts: { [string]: number } = {}
+		for _, name in vault do
+			if typeof(name) == "string" then
+				counts[name] = (counts[name] or 0) + 1
+			end
+		end
+		local names = {}
+		for name in counts do
+			table.insert(names, name)
+		end
+		table.sort(names, function(a, b)
+			local defA, defB = SnackTypes.ByName[a], SnackTypes.ByName[b]
+			return (defA and defA.Income or 0) < (defB and defB.Income or 0)
+		end)
+
+		-- Liste neu aufbauen
+		for _, child in mergeList:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+
+		if #names == 0 then
+			local empty = Instance.new("Frame")
+			empty.Size = UDim2.new(1, 0, 0, 40)
+			empty.BackgroundTransparency = 1
+			empty.Parent = mergeList
+			makeLabel(empty, {
+				Size = UDim2.fromScale(1, 1),
+				Text = "🕸️ Dein Tresor ist leer – erst Snacks einlagern!",
+				TextColor3 = Color3.fromRGB(190, 190, 200),
+			})
+			return
+		end
+
+		for _, name in names do
+			local def = SnackTypes.ByName[name]
+			local count = counts[name]
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, 0, 0, 46)
+			row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+			roundify(row, 10)
+			row.Parent = mergeList
+
+			makeLabel(row, {
+				Position = UDim2.fromOffset(10, 2),
+				Size = UDim2.new(0.45, -10, 1, -4),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = ("%s  x%d"):format(name, count),
+				TextColor3 = (def and SnackTypes.RarityColors[def.Rarity]) or Color3.new(1, 1, 1),
+			})
+
+			local mergeable = def and SnackTypes.NextRarity(def.Rarity) ~= nil
+			if not mergeable then
+				makeLabel(row, {
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, -10, 0.5, 0),
+					Size = UDim2.new(0.5, 0, 0, 22),
+					TextXAlignment = Enum.TextXAlignment.Right,
+					Text = "MAX-Rarität 👑",
+					TextColor3 = Color3.fromRGB(255, 215, 0),
+				})
+			else
+				for slot, n in MERGE_COUNTS do
+					if count >= n and n <= Config.MergeMaxCount then
+						local button = Instance.new("TextButton")
+						button.AnchorPoint = Vector2.new(1, 0.5)
+						button.Position = UDim2.new(1, -8 - (#MERGE_COUNTS - slot) * 92, 0.5, 0)
+						button.Size = UDim2.fromOffset(86, 34)
+						button.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
+						button.Font = FONT
+						button.TextScaled = true
+						button.TextColor3 = Color3.new(1, 1, 1)
+						button.Text = ("x%d · %d%%"):format(n, Config.MergeChance(n) * 100)
+						roundify(button, 8)
+						button.Parent = row
+
+						button.Activated:Connect(function()
+							task.spawn(function()
+								local callOk, result = pcall(function()
+									return (Remotes.Get("DoMerge") :: RemoteFunction):InvokeServer(name, n)
+								end)
+								if callOk and result then
+									Ui.Toast((result.ok and (result.success and "🧪✨ " or "🧪💥 ") or "❌ ") .. result.msg)
+								end
+								refreshMerge()
+							end)
+						end)
+					end
+				end
+			end
+		end
+	end)
+end
+
+local function buildMergeUi()
+	local frame = makeWindow("🧪 MERGE-MASCHINE 3000", Vector2.new(480, 420), Color3.fromRGB(180, 120, 255))
+	shopWindows.Merge = frame
+
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 34),
+		Text = "Gleiche Snacks mergen = Chance auf SELTENER!\n💥 Bei Misserfolg sind ALLE eingesetzten Snacks WEG!",
+		TextColor3 = Color3.fromRGB(255, 160, 160),
+		TextScaled = false,
+		TextSize = 14,
+		TextWrapped = true,
+	})
+
+	mergeList = Instance.new("ScrollingFrame")
+	mergeList.Position = UDim2.new(0, 12, 0, 84)
+	mergeList.Size = UDim2.new(1, -24, 1, -96)
+	mergeList.BackgroundTransparency = 1
+	mergeList.BorderSizePixel = 0
+	mergeList.ScrollBarThickness = 6
+	mergeList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	mergeList.CanvasSize = UDim2.new()
+	mergeList.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.Parent = mergeList
+end
+
+-- ══════════ Fenster öffnen (vom OpenShop-Remote getriggert) ══════════
+
+function Ui.OpenShop(shopId: string)
+	local frame = shopWindows[shopId]
+	if not frame then
+		return
+	end
+	for _, other in shopWindows do
+		other.Visible = false -- immer nur ein Fenster offen
+	end
+	frame.Visible = true
+	if shopId == "Upgrade" then
+		refreshShop()
+	elseif shopId == "Pets" or shopId == "Style" then
+		refreshCollectionShops()
+	elseif shopId == "Merge" then
+		refreshMerge()
+	end
 end
 
 -- ══════════ YEET-Ladebalken & Halte-Hinweis ══════════
@@ -434,6 +745,8 @@ local function buildHelp()
 		"🌟 Im GOLDENEN Bereich loslassen = Extra-Power!",
 		"👋 [Q] SLAP! Träger verlieren ihren Snack...",
 		"🏦 Tresor-Snacks = Cash/Sekunde",
+		"🏪 Shops & Merge-Maschine sind ORTE am Plaza-Rand!",
+		"🧪 Merge: 2+ gleiche Snacks = Chance auf seltener (RISIKO!)",
 		"😈 Fremde Tresore kann man KNACKEN [E halten]",
 		"🔥 Schnell nacheinander einlagern = COMBO-Bonus",
 		"🌟 SUGAR RUSH (Rebirth) = +50% Einkommen für immer",
@@ -490,6 +803,29 @@ function Ui.Build()
 
 	buildCashDisplay()
 	buildShop()
+	buildCollectionShop(
+		"Pets",
+		"🐹 PET-SHOP",
+		Color3.fromRGB(140, 230, 160),
+		Config.Pets,
+		petRows,
+		"BuyPet",
+		"EquipPet",
+		"Pets",
+		"EquippedPet"
+	)
+	buildCollectionShop(
+		"Style",
+		"✨ STYLE-SHOP",
+		Color3.fromRGB(240, 140, 240),
+		Config.Trails,
+		trailRows,
+		"BuyTrail",
+		"EquipTrail",
+		"Trails",
+		"EquippedTrail"
+	)
+	buildMergeUi()
 	buildChargeBar()
 	buildHelp()
 end

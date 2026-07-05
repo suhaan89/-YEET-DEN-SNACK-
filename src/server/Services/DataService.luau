@@ -25,6 +25,10 @@ local function defaultProfile()
 		Upgrades = { Wurfkraft = 0, SlapPower = 0, Tempo = 0, Schloss = 0 },
 		Vault = {}, -- Liste von Snack-Namen (Strings), Details stehen in SnackTypes
 		TotalYeets = 0,
+		Pets = {}, -- gekaufte Pets: { [petId] = true }
+		EquippedPet = "", -- Id des ausgerüsteten Pets ("" = keins)
+		Trails = {}, -- gekaufte Trails: { [trailId] = true }
+		EquippedTrail = "", -- Id des aktiven Trails ("" = keiner)
 	}
 end
 
