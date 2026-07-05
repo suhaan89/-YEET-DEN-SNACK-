@@ -11,6 +11,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(shared:WaitForChild("Config"))
@@ -60,9 +61,56 @@ end);
 	Ui.Toast(text)
 end);
 
+-- ══════════ Basis-Flash bei Treffer ══════════
+-- Landet ein Snack in einer Basis-Zone, leuchtet die getroffene Basis kurz auf.
+-- Getriggert über das "bank"-Sound-Event (kommt mit der Einschlag-Position).
+
+local function flashBaseAt(position: Vector3)
+	local map = workspace:FindFirstChild("Map")
+	if not map then
+		return
+	end
+	for _, folder in map:GetChildren() do
+		if not folder.Name:match("^Base_") then
+			continue
+		end
+		local floor = folder:FindFirstChild("Floor")
+		if not (floor and floor:IsA("BasePart")) then
+			continue
+		end
+		local offset = position - floor.Position
+		if math.abs(offset.X) > floor.Size.X / 2 + 2 or math.abs(offset.Z) > floor.Size.Z / 2 + 2 then
+			continue
+		end
+		-- Treffer! Boden + Tresor golden aufblitzen lassen
+		for _, partName in { "Floor", "Vault" } do
+			local part = folder:FindFirstChild(partName)
+			if part and part:IsA("BasePart") then
+				local highlight = Instance.new("Highlight")
+				highlight.FillColor = Color3.fromRGB(255, 220, 80)
+				highlight.OutlineColor = Color3.fromRGB(255, 240, 160)
+				highlight.FillTransparency = 0.15
+				highlight.OutlineTransparency = 0
+				highlight.Parent = part
+				TweenService:Create(highlight, TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+					FillTransparency = 1,
+					OutlineTransparency = 1,
+				}):Play()
+				task.delay(0.75, function()
+					highlight:Destroy()
+				end)
+			end
+		end
+		return
+	end
+end
+
 -- Sound-Effekte vom Server (mit Entfernungs-Check)
 (Remotes.Get("Sfx") :: RemoteEvent).OnClientEvent:Connect(function(name, position)
 	SoundFx.Play(name, position)
+	if name == "bank" and typeof(position) == "Vector3" then
+		flashBaseAt(position)
+	end
 end);
 
 -- Shop-Gebäude betreten (ProximityPrompt) -> Server sagt uns, welches Fenster aufgeht
@@ -161,10 +209,71 @@ local function ensureDots()
 	end
 end
 
+-- Landing-Ring: leuchtender Kreis am voraussichtlichen Aufschlagpunkt
+local landingRing: BasePart? = nil
+
+local function ensureLandingRing(): BasePart
+	if landingRing then
+		return landingRing
+	end
+	local ring = Instance.new("Part")
+	ring.Name = "LandingRing"
+	ring.Shape = Enum.PartType.Cylinder
+	ring.Size = Vector3.new(0.25, 7, 7)
+	ring.Material = Enum.Material.Neon
+	ring.Color = Color3.fromRGB(255, 220, 80)
+	ring.Transparency = 0.25
+	ring.Anchored = true
+	ring.CanCollide = false
+	ring.CanQuery = false
+	ring.CanTouch = false
+	landingRing = ring
+	return ring
+end
+
 local function hideTrajectory()
 	for _, dot in trajectoryDots do
 		dot.Parent = nil
 	end
+	if landingRing then
+		landingRing.Parent = nil
+	end
+end
+
+-- Flugbahn weitersimulieren und per Raycast den Boden-Treffpunkt finden.
+-- Gleiche Physik wie die Punkte-Vorschau, nur länger (bis ~3,5 Sek. Flugzeit).
+local function updateLandingRing(origin: Vector3, velocity: Vector3, gravity: Vector3)
+	local ring = ensureLandingRing()
+
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude: { Instance } = { ring }
+	if player.Character then
+		table.insert(exclude, player.Character)
+	end
+	local snacks = workspace:FindFirstChild("Snacks")
+	if snacks then
+		table.insert(exclude, snacks)
+	end
+	rayParams.FilterDescendantsInstances = exclude
+
+	local step = 0.08
+	local lastPos = origin
+	for i = 1, 45 do
+		local t = i * step
+		local nextPos = origin + velocity * t + gravity * (0.5 * t * t)
+		local result = workspace:Raycast(lastPos, nextPos - lastPos, rayParams)
+		if result then
+			-- Zylinder-Achse ist X -> X entlang der Oberflächen-Normale drehen
+			local up = result.Normal
+			ring.CFrame = CFrame.new(result.Position + up * 0.15, result.Position + up * 1.15)
+				* CFrame.Angles(0, math.rad(90), 0)
+			ring.Parent = workspace
+			return
+		end
+		lastPos = nextPos
+	end
+	ring.Parent = nil -- kein Boden in Reichweite gefunden
 end
 
 local function updateTrajectory(charge: number)
@@ -196,6 +305,8 @@ local function updateTrajectory(charge: number)
 		dot.Position = origin + velocity * t + gravity * (0.5 * t * t)
 		dot.Parent = workspace
 	end
+
+	updateLandingRing(origin, velocity, gravity)
 end
 
 -- ══════════ YEET-Aufladung ══════════
