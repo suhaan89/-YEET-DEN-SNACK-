@@ -386,11 +386,12 @@ local function runTutorial()
 	tutorialShown = true
 	local steps = {
 		"👋 Willkommen bei YEET DEN SNACK!",
+		"🏠 Such dir ZUERST eine FREIE BASIS und drück E am Tresor – die gehört dann dir!",
 		"🚚 Gleich kommt der SCHOKO-TRUCK und verliert Snacks!",
 		"✋ Drück E bei einem Snack zum Aufheben – aber nur 4 Sekunden halten!",
 		"🖱️ Klick HALTEN & loslassen = YEET Richtung deiner Basis (folge dem gelben Strahl!)",
 		"👋 Q = SLAP! Wer getroffen wird, lässt seinen Snack fallen...",
-		"🏦 Snacks im Tresor = Cash pro Sekunde. Besuch die SHOPS am Plaza-Rand!",
+		"🏦 Snacks im Tresor = Cash pro Sekunde. Aber Achtung: die Plätze sind BEGRENZT!",
 	}
 	for i, text in steps do
 		task.delay((i - 1) * 6, Ui.Toast, text)

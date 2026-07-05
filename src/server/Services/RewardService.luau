@@ -24,9 +24,13 @@ local sfxRemote: RemoteEvent
 
 local lastGift: { [Player]: number } = {}
 
-local function giveGift(player: Player)
+-- Gibt false zurück, wenn der Tresor voll war (Geschenk wird dann verschoben)
+local function giveGift(player: Player): boolean
 	local def = SnackTypes.RollRandom()
-	BaseService.AddToVault(player, def.Name)
+	if not BaseService.AddToVault(player, def.Name) then
+		notifyRemote:FireClient(player, "🎁 Dein Spielzeit-Geschenk WARTET – erst Platz im Tresor schaffen! [R am Tresor]")
+		return false
+	end
 	notifyRemote:FireClient(player, ("🎁 Spielzeit-Geschenk: %s! (+%d💰/s)"):format(def.Name, def.Income))
 	sfxRemote:FireClient(player, "ding")
 	if def.Announce then
@@ -35,6 +39,7 @@ local function giveGift(player: Player)
 			def.Rarity
 		)
 	end
+	return true
 end
 
 function RewardService.Init(services)
@@ -65,8 +70,12 @@ function RewardService.Init(services)
 					and DataService.Get(player)
 					and BaseService.GetBaseOf(player)
 				then
-					lastGift[player] = now
-					giveGift(player)
+					if giveGift(player) then
+						lastGift[player] = now
+					else
+						-- Tresor voll: in ~60s nochmal probieren (statt alle 15s zu nerven)
+						lastGift[player] = now - Config.PlaytimeGiftInterval + 60
+					end
 				end
 			end
 		end

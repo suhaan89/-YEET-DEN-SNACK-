@@ -52,9 +52,17 @@ local Config = {
 	WalkSpeedBase = 16,
 	WalkSpeedPerTempo = 2,
 
-	RebirthBaseCost = 10000,
-	RebirthCostFactor = 2.5,
+	-- Kurve bewusst steil (25k/75k/225k/675k/2M/...): Rebirths sollen sich
+	-- wie echte Meilensteine anfühlen, nicht wie ein Zwischensnack.
+	RebirthBaseCost = 25000,
+	RebirthCostFactor = 3,
 	RebirthBonus = 0.5, -- +50% Einkommen pro Rebirth ("Sugar Rush")
+
+	-- ══ Tresor-Kapazität ══
+	-- Der Tresor hat begrenzte Plätze – mehr gibt's nur durch Rebirths.
+	VaultLimitBase = 20, -- Snack-Plätze ohne Rebirth
+	VaultLimitPerRebirth = 10, -- + Plätze pro Rebirth (macht den Sugar Rush bedeutsamer)
+	VaultFullNotifyCooldown = 3, -- Sekunden zwischen zwei "Tresor voll!"-Meldungen
 
 	-- ══ Juice & Events ══
 	SweetSpotStart = 0.85, -- Ladung ab hier = PERFEKTER YEET
@@ -123,6 +131,11 @@ end
 -- Kosten für den nächsten Rebirth
 function Config.RebirthCost(rebirths: number): number
 	return math.floor(Config.RebirthBaseCost * Config.RebirthCostFactor ^ rebirths)
+end
+
+-- Maximale Tresor-Plätze bei `rebirths` Rebirths
+function Config.VaultLimit(rebirths: number): number
+	return Config.VaultLimitBase + rebirths * Config.VaultLimitPerRebirth
 end
 
 -- Erfolgschance für einen Merge mit `count` gleichen Snacks (Client-Anzeige + Server-Wurf

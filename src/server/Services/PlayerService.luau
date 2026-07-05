@@ -35,6 +35,7 @@ function PlayerService.Sync(player: Player)
 		player:SetAttribute(name, level)
 	end
 	player:SetAttribute("Multiplier", DataService.GetMultiplier(player))
+	player:SetAttribute("VaultLimit", Config.VaultLimit(profile.Rebirths))
 	PlayerService.UpdateOverhead(player)
 end
 

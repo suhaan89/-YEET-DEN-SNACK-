@@ -17,6 +17,9 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
 4. 🏦 Landet der Snack in der eigenen Basis-Zone → Tresor → **Cash/Sekunde**.
    Eingelagerte Snacks stehen als **Mini-Modelle sichtbar auf der Basis** (max. 24).
    Landet er in einer fremden Zone → gehört dem anderen (FEHLWURF-Announcement 😂).
+   Der Tresor hat **begrenzte Plätze** (20 + 10 pro Rebirth, `Config.VaultLimit`);
+   ist er voll, bleibt der Snack liegen. Mit **[R] am eigenen Tresor** wird der
+   billigste Snack rausgeworfen, um Platz zu schaffen.
 5. 👋 Q = SLAP: Ragdoll-Flug. Snack-Träger lassen fallen und werden 5 Sek.
    **selbst zum Snack verwandelt** (verwandelte fliegen bei Slaps 1,5× weiter –
    "Snack-Kick"). Träger von Legendary+ leuchten für alle sichtbar.
@@ -27,7 +30,11 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
 8. 🎁 Alle 4 Minuten Spielzeit: **Geschenk-Snack** direkt in den Tresor
    (Anti-Frust für Neulinge, RewardService).
 9. 🌟 **Sugar Rush** (Rebirth): Cash & Upgrades resetten, +50 % Einkommen für
-   immer, Sterne überm Kopf. Die Tresor-Sammlung bleibt.
+   immer, mehr Tresor-Plätze, Sterne überm Kopf. Der Tresor springt dabei AUF:
+   alle Snacks fliegen als lose Beute aus der Basis (mit kurzer Bank-Immunität,
+   damit die eigene Zone sie nicht sofort wieder einsaugt) – Chaos-Moment!
+10. 🏠 Basen werden **nicht automatisch zugewiesen**: Neue Spieler suchen sich
+   eine FREIE BASIS aus und beanspruchen sie per [E] am Tresor.
 
 ## Entwicklung
 
@@ -54,7 +61,8 @@ src/server/   → ServerScriptService.Server
   Services/MapService      Baut die Platzhalter-Map aus Code
   Services/DataService     DataStore: Laden/Speichern/Autosave (pcall-gesichert)
   Services/PlayerService   Leaderstats, Attribute, WalkSpeed, Cash-API, Rebirth-Sterne
-  Services/BaseService     8 Basen, Tresore, Fang-Zonen, Einkommen, Knack-Mechanik
+  Services/BaseService     8 Basen (per Prompt beanspruchen), Tresore mit Limit,
+                           Fang-Zonen, Einkommen, Knack-/Rauswerf-/Freilass-Mechanik
   Services/SnackService    Spawnen/Greifen/YEETen/Einlagern, Verwandlung, Combos
   Services/SlapService     Slap mit Cooldown, Reichweiten-Check, POW-Effekt
   Services/TruckService    Truck-Event (räumliche Abfragen statt .Touched!), Rush Hour

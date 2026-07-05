@@ -244,7 +244,7 @@ local function refreshShop()
 			row.Button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
 		end
 	end
-	rebirthButton.Text = ("🌟 SUGAR RUSH! (%s💰)  – Reset für +%d%% Einkommen"):format(
+	rebirthButton.Text = ("🌟 SUGAR RUSH! (%s💰) – Tresor fliegt RAUS, dafür +%d%% Einkommen & mehr Plätze!"):format(
 		formatNumber(Config.RebirthCost(rebirths)),
 		Config.RebirthBonus * 100
 	)
@@ -870,17 +870,19 @@ local function buildHelp()
 	})
 
 	local helpText = table.concat({
+		"🏠 Zuerst: FREIE BASIS suchen & [E] am Tresor drücken!",
 		"🚚 Der SCHOKO-TRUCK verliert alle 3 Min Snacks",
 		"✋ [E] Snack aufheben – nur 4 Sek. haltbar!",
 		"🖱️ Klick HALTEN & loslassen = YEET zur Basis",
 		"🌟 Im GOLDENEN Bereich loslassen = Extra-Power!",
 		"👋 [Q] SLAP! Träger verlieren ihren Snack...",
-		"🏦 Tresor-Snacks = Cash/Sekunde",
+		"🏦 Tresor-Snacks = Cash/Sekunde – aber die PLÄTZE sind begrenzt!",
+		"🗑️ [R] am eigenen Tresor = billigsten Snack rauswerfen",
 		"🏪 Shops & Merge-Maschine sind ORTE am Plaza-Rand!",
 		"🧪 Merge: 2+ gleiche Snacks = Chance auf seltener (RISIKO!)",
 		"😈 Fremde Tresore kann man KNACKEN [E halten]",
 		"🔥 Schnell nacheinander einlagern = COMBO-Bonus",
-		"🌟 SUGAR RUSH (Rebirth) = +50% Einkommen für immer",
+		"🌟 SUGAR RUSH: Tresor springt AUF (Snacks für alle!), dafür +50% Einkommen & mehr Plätze!",
 	}, "\n")
 
 	local body = Instance.new("TextLabel")

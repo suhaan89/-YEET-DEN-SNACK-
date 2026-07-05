@@ -88,8 +88,14 @@ local COMMANDS = {
 		Id = "FillVault",
 		Label = "🏦 Tresor +20 Snacks",
 		Handler = function(player, services)
+			local added = 0
 			for _ = 1, 20 do
-				services.BaseService.AddToVault(player, SnackTypes.RollRandom().Name)
+				if services.BaseService.AddToVault(player, SnackTypes.RollRandom().Name) then
+					added += 1
+				end
+			end
+			if added < 20 then
+				return ("+%d Snacks – dann war der Tresor VOLL (Limit-Test geglückt!)"):format(added)
 			end
 			return "+20 zufällige Snacks im Tresor!"
 		end,

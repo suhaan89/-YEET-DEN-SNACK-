@@ -31,6 +31,9 @@ local sfxRemote: RemoteEvent
 -- Combo-Tracking: schnelles Einlagern hintereinander gibt Bonus-Cash
 local combos: { [Player]: { Count: number, Last: number } } = {}
 
+-- "Tresor voll!"-Meldungen drosseln (Touched feuert sonst im Sekundentakt)
+local vaultFullNotify: { [Player]: number } = {}
+
 local function announce(text: string, rarity: string?)
 	announceRemote:FireAllClients(text, rarity)
 end
@@ -105,11 +108,24 @@ local function bank(entry, owner: Player)
 	if entry.State ~= "Loose" then
 		return
 	end
-	entry.State = "Banked"
-	entries[entry.Part] = nil
+	-- Frisch aus einem Tresor geworfen/geklaut? Dann nicht sofort wieder einlagern.
+	if entry.NoBankUntil and os.clock() < entry.NoBankUntil then
+		return
+	end
 
 	local def = entry.Def
-	BaseService.AddToVault(owner, def.Name)
+	if not BaseService.AddToVault(owner, def.Name) then
+		-- Tresor voll (oder Daten noch nicht geladen): Snack bleibt liegen
+		local now = os.clock()
+		if now - (vaultFullNotify[owner] or 0) >= Config.VaultFullNotifyCooldown then
+			vaultFullNotify[owner] = now
+			notify(owner, "🏦 TRESOR VOLL! [R] am Tresor wirft Snacks raus – oder merge/rebirthe für Platz!")
+		end
+		return
+	end
+
+	entry.State = "Banked"
+	entries[entry.Part] = nil
 	notify(owner, ("🍫 %s eingelagert! (+%d💰/s)"):format(def.Name, def.Income))
 	sfxRemote:FireAllClients("bank", entry.Part.Position)
 
@@ -162,7 +178,10 @@ end
 
 -- ══════════ Spawnen ══════════
 
-function SnackService.SpawnSnack(def, position: Vector3, velocity: Vector3?): BasePart
+-- noBankSeconds: so lange kann der Snack NICHT eingelagert werden – für Snacks,
+-- die gerade erst aus einem Tresor geflogen sind (Klau/Rauswurf), sonst saugt
+-- die VaultZone sie sofort wieder ein.
+function SnackService.SpawnSnack(def, position: Vector3, velocity: Vector3?, noBankSeconds: number?): BasePart
 	if countLoose() >= Config.MaxLooseSnacks then
 		destroyOldestLoose()
 	end
@@ -235,6 +254,7 @@ function SnackService.SpawnSnack(def, position: Vector3, velocity: Vector3?): Ba
 		Weld = nil,
 		SpawnedAt = os.clock(),
 		LastThrower = nil :: Player?,
+		NoBankUntil = if noBankSeconds then os.clock() + noBankSeconds else nil,
 	}
 	entries[part] = entry
 
@@ -509,6 +529,7 @@ function SnackService.Init(services)
 			release(entry)
 		end
 		combos[player] = nil
+		vaultFullNotify[player] = nil
 	end)
 
 	-- Aufräum-Schleife: alte lose Snacks despawnen,

@@ -1,7 +1,14 @@
 --[[
 	BaseService.luau
-	Spieler-Basen: Zuweisung, Tresor (Vault), Einkommens-Schleife
+	Spieler-Basen: Beanspruchen, Tresor (Vault), Einkommens-Schleife
 	und die Tresor-Knack-Mechanik (Klauen bei anderen Spielern).
+
+	Basen werden NICHT automatisch zugewiesen: Neue Spieler laufen zu einer
+	freien Basis und beanspruchen sie per ProximityPrompt am Tresor.
+
+	Der Tresor hat begrenzte Plätze (Config.VaultLimit, steigt mit Rebirths).
+	Ist er voll, wird nichts mehr eingelagert – der Besitzer kann am eigenen
+	Tresor per [R] den billigsten Snack rauswerfen, um Platz zu schaffen.
 
 	Jede Basis:
 	- Floor      = farbige Bodenplatte
@@ -96,12 +103,13 @@ local function updateDisplay(base)
 	if owner then
 		local profile = DataService.Get(owner)
 		local count = profile and #profile.Vault or 0
+		local limit = Config.VaultLimit(profile and profile.Rebirths or 0)
 		local income = math.floor(getVaultIncome(owner) * DataService.GetMultiplier(owner))
 		base.NameLabel.Text = "🏠 " .. owner.Name
-		base.InfoLabel.Text = ("🍫 %d Snacks  |  %d💰/s"):format(count, income)
+		base.InfoLabel.Text = ("🍫 %d/%d Snacks  |  %d💰/s"):format(count, limit, income)
 	else
 		base.NameLabel.Text = "FREIE BASIS"
-		base.InfoLabel.Text = "—"
+		base.InfoLabel.Text = "Hinlaufen & [E] drücken!"
 	end
 end
 
@@ -177,6 +185,28 @@ local function buildBase(index: number, slot: CFrame)
 	prompt.Enabled = false
 	prompt.Parent = vault
 
+	-- Beanspruchen-Prompt: freie Basis per Hinlaufen + [E] übernehmen
+	local claimPrompt = Instance.new("ProximityPrompt")
+	claimPrompt.ActionText = "Basis beanspruchen!"
+	claimPrompt.ObjectText = "Freie Basis"
+	claimPrompt.HoldDuration = 0.3
+	claimPrompt.MaxActivationDistance = 14
+	claimPrompt.RequiresLineOfSight = false
+	claimPrompt.Enabled = true
+	claimPrompt.Parent = vault
+
+	-- Rauswerfen-Prompt: nur für den Besitzer (Platz schaffen, wenn der Tresor voll ist)
+	local dropPrompt = Instance.new("ProximityPrompt")
+	dropPrompt.ActionText = "Snack rauswerfen (Besitzer)"
+	dropPrompt.ObjectText = "Tresor"
+	dropPrompt.KeyboardKeyCode = Enum.KeyCode.R
+	dropPrompt.GamepadKeyCode = Enum.KeyCode.ButtonY -- ButtonX ist schon der Slap!
+	dropPrompt.HoldDuration = 0
+	dropPrompt.MaxActivationDistance = 10
+	dropPrompt.RequiresLineOfSight = false
+	dropPrompt.Enabled = false
+	dropPrompt.Parent = vault
+
 	-- Ordner für die Mini-Snack-Anzeige (der sichtbare Hort)
 	local hoardFolder = Instance.new("Folder")
 	hoardFolder.Name = "Hoard"
@@ -192,6 +222,8 @@ local function buildBase(index: number, slot: CFrame)
 		Vault = vault,
 		Zone = zone,
 		Prompt = prompt,
+		ClaimPrompt = claimPrompt,
+		DropPrompt = dropPrompt,
 		NameLabel = nameLabel,
 		InfoLabel = infoLabel,
 		HoardFolder = hoardFolder,
@@ -208,6 +240,14 @@ local function buildBase(index: number, slot: CFrame)
 
 	prompt.Triggered:Connect(function(player)
 		BaseService.TryCrack(player, base)
+	end)
+
+	claimPrompt.Triggered:Connect(function(player)
+		BaseService.TryClaim(player, base)
+	end)
+
+	dropPrompt.Triggered:Connect(function(player)
+		BaseService.TryDropSnack(player, base)
 	end)
 
 	updateDisplay(base)
@@ -244,9 +284,12 @@ function BaseService.TryCrack(thief: Player, base)
 	updateDisplay(base)
 
 	if def then
-		-- Snack ploppt vor dem Tresor raus – der Dieb muss ihn erst heimYEETen!
+		-- Snack ploppt vor dem Tresor raus und fliegt Richtung Straße –
+		-- der Dieb muss ihn erst heimYEETen! Kurze Bank-Immunität, sonst
+		-- landet er in der VaultZone und wird sofort wieder eingelagert.
 		local spawnCFrame = base.Vault.CFrame * CFrame.new(0, 2, -8)
-		SnackService.SpawnSnack(def, spawnCFrame.Position, Vector3.new(0, 20, 0))
+		local outward = base.Slot.LookVector -- lokales -Z = Richtung Straße
+		SnackService.SpawnSnack(def, spawnCFrame.Position, outward * 55 + Vector3.new(0, 30, 0), 3)
 	end
 
 	notifyRemote:FireClient(owner, ("😱 %s hat '%s' aus deinem Tresor geklaut!"):format(thief.Name, snackName))
@@ -263,16 +306,123 @@ function BaseService.GetZoneOwner(zone: BasePart): Player?
 	return base and base.Owner
 end
 
-function BaseService.AddToVault(owner: Player, snackName: string)
+-- Snack einlagern. Gibt false zurück, wenn der Tresor voll ist
+-- (Limit = Config.VaultLimit, steigt mit Rebirths) – Aufrufer entscheidet,
+-- was dann mit dem Snack passiert (liegen lassen, Geschenk verschieben, ...).
+function BaseService.AddToVault(owner: Player, snackName: string): boolean
 	local profile = DataService.Get(owner)
 	if not profile then
-		return
+		return false
+	end
+	if #profile.Vault >= Config.VaultLimit(profile.Rebirths) then
+		return false
 	end
 	table.insert(profile.Vault, snackName)
 	local base = playerToBase[owner]
 	if base then
 		updateDisplay(base)
 	end
+	return true
+end
+
+-- Billigsten Snack aus dem EIGENEN Tresor werfen (Platz schaffen!).
+-- Der Snack landet als loses Part vor dem Tresor – wer ihn will, muss ihn neu einlagern.
+function BaseService.TryDropSnack(player: Player, base)
+	if player ~= base.Owner then
+		notifyRemote:FireClient(player, "😅 Rauswerfen darf nur der Besitzer – knack den Tresor doch einfach!")
+		return
+	end
+	local profile = DataService.Get(player)
+	if not profile or #profile.Vault == 0 then
+		notifyRemote:FireClient(player, "🕸️ Dein Tresor ist leer – nichts zum Rauswerfen.")
+		return
+	end
+
+	-- Den WERTLOSESTEN Snack opfern (schützt die seltenen Schätze vor Fett-Fingern)
+	local cheapestIndex, cheapestIncome = 1, math.huge
+	for i, name in profile.Vault do
+		local def = SnackTypes.ByName[name]
+		local income = def and def.Income or 0
+		if income < cheapestIncome then
+			cheapestIndex, cheapestIncome = i, income
+		end
+	end
+	local snackName = table.remove(profile.Vault, cheapestIndex)
+	updateDisplay(base)
+
+	local def = SnackTypes.ByName[snackName]
+	if def then
+		-- Richtung Straße yeeten + Bank-Immunität, sonst lagert er sich sofort wieder selbst ein
+		local spawnCFrame = base.Vault.CFrame * CFrame.new(0, 2, -8)
+		local outward = base.Slot.LookVector
+		SnackService.SpawnSnack(
+			def,
+			spawnCFrame.Position,
+			outward * 55 + Vector3.new(math.random(-8, 8), 28, 0),
+			3
+		)
+	end
+	notifyRemote:FireClient(
+		player,
+		("🗑️ '%s' rausgeworfen! (%d/%d Plätze belegt)"):format(
+			snackName,
+			#profile.Vault,
+			Config.VaultLimit(profile.Rebirths)
+		)
+	)
+end
+
+-- Beim Rebirth: ALLE Tresor-Snacks freilassen! Sie fliegen aus der Basis raus
+-- Richtung Plaza (mit Bank-Immunität, sonst saugt die eigene VaultZone sie
+-- sofort wieder ein) – wer sie will (auch der Ex-Besitzer!), muss sie neu erobern.
+-- Gibt die Anzahl der befreiten Snacks zurück.
+function BaseService.ReleaseVaultSnacks(player: Player): number
+	local profile = DataService.Get(player)
+	if not profile or #profile.Vault == 0 then
+		return 0
+	end
+	local released = table.clone(profile.Vault)
+	table.clear(profile.Vault)
+
+	local base = playerToBase[player]
+	if base then
+		updateDisplay(base)
+		local outward = base.Slot.LookVector -- lokales -Z = Richtung Straße
+		for i, snackName in released do
+			local def = SnackTypes.ByName[snackName]
+			if def then
+				-- Gestaffelt rauswerfen – sieht aus wie eine Tresor-Explosion!
+				task.delay((i - 1) * 0.08, function()
+					local spawnCFrame = base.Vault.CFrame * CFrame.new(math.random(-3, 3), 2, -6)
+					SnackService.SpawnSnack(
+						def,
+						spawnCFrame.Position,
+						outward * math.random(40, 70) + Vector3.new(math.random(-18, 18), math.random(25, 45), math.random(-18, 18)),
+						5
+					)
+				end)
+			end
+		end
+	else
+		-- Kein eigenes Zuhause (sollte selten sein): Snacks um den Spieler verteilen
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local origin = root and root.Position or Vector3.new(0, 10, 0)
+		for i, snackName in released do
+			local def = SnackTypes.ByName[snackName]
+			if def then
+				task.delay((i - 1) * 0.08, function()
+					SnackService.SpawnSnack(
+						def,
+						origin + Vector3.new(0, 4, 0),
+						Vector3.new(math.random(-40, 40), math.random(25, 45), math.random(-40, 40)),
+						5
+					)
+				end)
+			end
+		end
+	end
+	return #released
 end
 
 -- Schloss-Upgrade anwenden: Diebe brauchen länger
@@ -297,31 +447,38 @@ function BaseService.RefreshDisplay(player: Player)
 	end
 end
 
--- ══════════ Zuweisung ══════════
+-- ══════════ Beanspruchen ══════════
 
-local function assign(player: Player)
-	for _, base in bases do
-		if not base.Owner then
-			base.Owner = player
-			playerToBase[player] = base
-			local color = BASE_COLORS[base.Index] or FREE_COLOR
-			base.Floor.Color = color
-			base.Zone.Color = color
-			base.Prompt.Enabled = true
-			-- Für den Heimweg-Pfeil auf dem Client
-			player:SetAttribute("VaultPos", base.Vault.Position)
-			-- Anzeige erst aktualisieren, wenn die Daten geladen sind
-			task.spawn(function()
-				DataService.WaitFor(player)
-				if base.Owner == player then
-					updateDisplay(base)
-					BaseService.RefreshLock(player)
-				end
-			end)
-			return
-		end
+-- Freie Basis übernehmen (per ProximityPrompt am Tresor)
+function BaseService.TryClaim(player: Player, base)
+	if base.Owner then
+		notifyRemote:FireClient(player, "😅 Diese Basis gehört schon jemandem!")
+		return
 	end
-	notifyRemote:FireClient(player, "⚠️ Alle Basen belegt! (Server voll)")
+	if playerToBase[player] then
+		notifyRemote:FireClient(player, "😅 Du hast schon eine Basis!")
+		return
+	end
+
+	base.Owner = player
+	playerToBase[player] = base
+	local color = BASE_COLORS[base.Index] or FREE_COLOR
+	base.Floor.Color = color
+	base.Zone.Color = color
+	base.Prompt.Enabled = true
+	base.DropPrompt.Enabled = true
+	base.ClaimPrompt.Enabled = false
+	-- Für den Heimweg-Pfeil auf dem Client
+	player:SetAttribute("VaultPos", base.Vault.Position)
+	notifyRemote:FireClient(player, "🏠 Das ist jetzt DEINE Basis! YEETe Snacks in die Zone!")
+	-- Anzeige erst aktualisieren, wenn die Daten geladen sind
+	task.spawn(function()
+		DataService.WaitFor(player)
+		if base.Owner == player then
+			updateDisplay(base)
+			BaseService.RefreshLock(player)
+		end
+	end)
 end
 
 local function releaseBase(player: Player)
@@ -331,6 +488,8 @@ local function releaseBase(player: Player)
 		base.Floor.Color = FREE_COLOR
 		base.Zone.Color = FREE_COLOR
 		base.Prompt.Enabled = false
+		base.DropPrompt.Enabled = false
+		base.ClaimPrompt.Enabled = true
 		playerToBase[player] = nil
 		updateDisplay(base)
 	end
@@ -350,11 +509,18 @@ function BaseService.Init(services)
 		table.insert(bases, buildBase(index, slot))
 	end
 
-	Players.PlayerAdded:Connect(assign)
+	-- Keine Auto-Zuweisung mehr: Spieler suchen sich ihre Basis selbst aus.
+	-- Kleiner Anstupser für alle, die nach ein paar Sekunden noch keine haben.
+	local function greet(player: Player)
+		task.delay(4, function()
+			if player.Parent and not playerToBase[player] then
+				notifyRemote:FireClient(player, "🏠 Such dir eine FREIE BASIS aus und drück [E] am Tresor!")
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(greet)
 	for _, player in Players:GetPlayers() do
-		if not playerToBase[player] then
-			assign(player)
-		end
+		greet(player)
 	end
 	Players.PlayerRemoving:Connect(releaseBase)
 

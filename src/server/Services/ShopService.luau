@@ -59,12 +59,15 @@ local function doRebirth(player: Player)
 		return { ok = false, msg = ("Du brauchst %d💰 für den Sugar Rush!"):format(cost) }
 	end
 
-	-- Reset: Cash + Upgrades weg, Tresor-Sammlung bleibt!
+	-- Reset: Cash + Upgrades weg – und der Tresor springt AUF!
+	-- Die Snacks werden befreit und fliegen aus der Basis (Chaos-Moment:
+	-- jeder darf sie sich schnappen, auch der frisch Rebirthte selbst).
 	profile.Cash = Config.StartCash
 	for name in profile.Upgrades do
 		profile.Upgrades[name] = 0
 	end
 	profile.Rebirths += 1
+	local freed = BaseService.ReleaseVaultSnacks(player)
 
 	PlayerService.Sync(player)
 	PlayerService.ApplySpeed(player)
@@ -79,7 +82,13 @@ local function doRebirth(player: Player)
 		),
 		"Mythic"
 	)
-	return { ok = true, msg = ("Sugar Rush #%d! Einkommen x%.1f"):format(profile.Rebirths, 1 + profile.Rebirths * Config.RebirthBonus) }
+	if freed > 0 then
+		announceRemote:FireAllClients(
+			("💥 %ss Tresor ist AUFGESPRUNGEN – %d Snacks liegen frei rum! SCHNAPPT SIE EUCH!"):format(player.Name, freed),
+			"Legendary"
+		)
+	end
+	return { ok = true, msg = ("Sugar Rush #%d! Einkommen x%.1f – dein Tresor wurde befreit!"):format(profile.Rebirths, 1 + profile.Rebirths * Config.RebirthBonus) }
 end
 
 -- Für das Debug-Menü exportiert: nimmt den GANZ NORMALEN Rebirth-Pfad
