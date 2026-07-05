@@ -14,11 +14,20 @@ local EVENTS = {
 	"Notify", -- Server -> ein Client: kleine Toast-Nachricht
 	"Fling", -- Server -> ein Client: eigene Velocity setzen (Client besitzt die Charakter-Physik!)
 	"Sfx", -- Server -> alle Clients: Sound abspielen (name, position?)
+	"OpenShop", -- Server -> ein Client: Shop-UI öffnen (shopId: "Upgrade"|"Pets"|"Style"|"Merge")
 }
 
 local FUNCTIONS = {
 	"BuyUpgrade", -- Client -> Server: Upgrade kaufen, gibt {ok, msg} zurück
 	"DoRebirth", -- Client -> Server: Sugar-Rush-Rebirth
+	"BuyPet", -- Client -> Server: Pet kaufen (petId), gibt {ok, msg} zurück
+	"EquipPet", -- Client -> Server: Pet ausrüsten/ablegen (petId oder ""), gibt {ok, msg} zurück
+	"BuyTrail", -- Client -> Server: Trail kaufen (trailId), gibt {ok, msg} zurück
+	"EquipTrail", -- Client -> Server: Trail ausrüsten/ablegen (trailId oder ""), gibt {ok, msg} zurück
+	"GetCollections", -- Client -> Server: eigene Pets/Trails + Ausrüstung abfragen
+	"GetVault", -- Client -> Server: eigenen Tresor-Inhalt abfragen (Liste von Snack-Namen)
+	"DoMerge", -- Client -> Server: Merge versuchen (snackName, count), gibt {ok, success?, msg} zurück
+	"DebugCommand", -- Client -> Server: Debug-Menü ("list" oder Command-Id) – nur Whitelist/Studio!
 }
 
 local Remotes = {}

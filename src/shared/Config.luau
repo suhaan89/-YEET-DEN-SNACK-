@@ -69,6 +69,46 @@ local Config = {
 	-- ══ Daten ══
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",
+
+	-- ══ Pet-Shop ══
+	-- Pets sind schwebende Begleiter, die passiv Cash generieren (skaliert mit Rebirth-Multiplikator).
+	-- Nur EIN Pet gleichzeitig ausgerüstet.
+	Pets = {
+		{ Id = "Hamster", Name = "🐹 Schoko-Hamster", Cost = 400, Income = 1, Color = Color3.fromRGB(160, 100, 50), Desc = "Knabbert Krümel zu Cash. +1💰/s" },
+		{ Id = "Dackel", Name = "🌭 Donut-Dackel", Cost = 2500, Income = 5, Color = Color3.fromRGB(255, 150, 200), Desc = "Halb Hund, halb Donut. +5💰/s" },
+		{ Id = "Einhorn", Name = "🦄 Zucker-Einhorn", Cost = 12000, Income = 20, Color = Color3.fromRGB(220, 160, 255), Desc = "Pupst Puderzucker. +20💰/s" },
+		{ Id = "Drache", Name = "🐉 Kakao-Drache", Cost = 60000, Income = 90, Color = Color3.fromRGB(120, 60, 200), Desc = "Speit heiße Schokolade. +90💰/s" },
+	},
+	PetIncomeTick = 1, -- Sekunden zwischen Pet-Einkommens-Ticks
+
+	-- ══ Style-Shop (Trails) ══
+	-- Rein kosmetische Lauf-Trails hinter dem Charakter. Nur EINER gleichzeitig aktiv.
+	Trails = {
+		{ Id = "Schoko", Name = "🍫 Schoko-Spur", Cost = 300, Color = Color3.fromRGB(120, 72, 30), Desc = "Hinterlasse eine leckere Schokoladenspur!" },
+		{ Id = "Gold", Name = "✨ Gold-Glitzer", Cost = 2000, Color = Color3.fromRGB(255, 215, 0), Desc = "Für Spieler mit Geschmack UND Geld." },
+		{ Id = "Feuer", Name = "🔥 Feuer-Furz", Cost = 8000, Color = Color3.fromRGB(255, 90, 20), Desc = "Zu viele scharfe Gummibärchen gegessen..." },
+		{ Id = "Regenbogen", Name = "🌈 Regenbogen-Turbo", Cost = 25000, Color = Color3.fromRGB(255, 255, 255), Rainbow = true, Desc = "Nyan-Modus aktiviert!" },
+	},
+
+	-- ══ Merge-Station ══
+	-- 2+ gleiche Tresor-Snacks einsetzen -> Chance auf 1 Snack der NÄCHSTHÖHEREN Rarität.
+	-- Bei Misserfolg (Standardfall!) sind ALLE eingesetzten Snacks weg.
+	MergeMinCount = 2, -- Mindestanzahl gleicher Snacks pro Versuch
+	MergeMaxCount = 10, -- Obergrenze pro Versuch (Server-Clamp)
+	MergeBaseChance = 0.3, -- Erfolgschance bei MergeMinCount Snacks
+	MergeChancePerExtra = 0.08, -- + Chance pro zusätzlichem Snack
+	MergeMaxChance = 0.6, -- Chance-Deckel (Misserfolg bleibt wahrscheinlich!)
+	MergeRange = 16, -- max. Abstand zur Merge-Station (Server-Check, Studs)
+
+	-- ══ Supreme Snack Event ══
+	-- Statt eines normalen Trucks kommt der MUTANTEN-EXPRESS und droppt mutierte Supreme-Snacks.
+	SupremeTrucksMin = 80, -- Countdown wird zufällig zwischen Min und Max gewürfelt
+	SupremeTrucksMax = 120, -- (im Schnitt ~100 Trucks bis zum Event)
+	SupremeSnackCount = 2, -- ca. so viele Supreme-Snacks droppt der Event-Truck
+
+	-- ══ Debug/Test-Menü ══
+	-- Im Studio ist das Menü IMMER sichtbar. Für Live-Server hier UserIds eintragen:
+	DebugUserIds = {} :: { number },
 }
 
 -- Kosten für das nächste Level eines Upgrades
@@ -83,6 +123,15 @@ end
 -- Kosten für den nächsten Rebirth
 function Config.RebirthCost(rebirths: number): number
 	return math.floor(Config.RebirthBaseCost * Config.RebirthCostFactor ^ rebirths)
+end
+
+-- Erfolgschance für einen Merge mit `count` gleichen Snacks (Client-Anzeige + Server-Wurf
+-- nutzen dieselbe Formel, damit die Anzeige nie lügt)
+function Config.MergeChance(count: number): number
+	return math.min(
+		Config.MergeMaxChance,
+		Config.MergeBaseChance + (count - Config.MergeMinCount) * Config.MergeChancePerExtra
+	)
 end
 
 return Config

@@ -18,7 +18,11 @@ SnackTypes.RarityColors = {
 	Legendary = Color3.fromRGB(255, 170, 30),
 	Mythic = Color3.fromRGB(255, 60, 60),
 	Secret = Color3.fromRGB(20, 20, 20),
+	Supreme = Color3.fromRGB(110, 255, 40), -- giftgrün – nur vom Mutanten-Express!
 }
+
+-- Raritäts-Reihenfolge für die Merge-Station (Merge-Ergebnis = eine Stufe höher)
+SnackTypes.RarityOrder = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret" }
 
 SnackTypes.List = {
 	{
@@ -103,10 +107,74 @@ SnackTypes.List = {
 	},
 }
 
+-- Supreme-Snacks: droppen NUR beim Supreme Snack Event (Mutanten-Express),
+-- nie aus dem normalen Truck. Deutlich höheres Einkommen als alles Normale.
+SnackTypes.SupremeList = {
+	{
+		Name = "Radioaktiver Gummibär",
+		Rarity = "Supreme",
+		Weight = 1,
+		Income = 2500,
+		Color = Color3.fromRGB(110, 255, 40),
+		Size = Vector3.new(2.5, 3.2, 1.8),
+		Slowdown = 0.5,
+		Announce = true,
+	},
+	{
+		Name = "Atomarer KitKat",
+		Rarity = "Supreme",
+		Weight = 1,
+		Income = 3200,
+		Color = Color3.fromRGB(60, 220, 90),
+		Size = Vector3.new(3.8, 1.2, 1.4),
+		Slowdown = 0.5,
+		Announce = true,
+	},
+	{
+		Name = "Glibber-Donut aus Dimension X",
+		Rarity = "Supreme",
+		Weight = 1,
+		Income = 4000,
+		Color = Color3.fromRGB(160, 255, 120),
+		Size = Vector3.new(3.5, 1.3, 3.5),
+		Slowdown = 0.45,
+		Announce = true,
+	},
+}
+
 -- Schneller Zugriff über den Namen (fürs Laden aus dem DataStore)
+-- WICHTIG: Supreme-Snacks müssen hier mit rein, sonst zählt ihr Tresor-Einkommen nicht!
 SnackTypes.ByName = {}
 for _, def in SnackTypes.List do
 	SnackTypes.ByName[def.Name] = def
+end
+for _, def in SnackTypes.SupremeList do
+	SnackTypes.ByName[def.Name] = def
+end
+
+-- Snacks nach Rarität gruppiert (für die Merge-Station)
+SnackTypes.ByRarity = {} :: { [string]: { any } }
+for _, def in SnackTypes.List do
+	local bucket = SnackTypes.ByRarity[def.Rarity]
+	if not bucket then
+		bucket = {}
+		SnackTypes.ByRarity[def.Rarity] = bucket
+	end
+	table.insert(bucket, def)
+end
+
+-- Nächsthöhere Rarität (oder nil, wenn schon am Anschlag / unbekannt)
+function SnackTypes.NextRarity(rarity: string): string?
+	local index = table.find(SnackTypes.RarityOrder, rarity)
+	if not index then
+		return nil
+	end
+	return SnackTypes.RarityOrder[index + 1]
+end
+
+-- Zufälliger Supreme-Snack (für den Mutanten-Express)
+function SnackTypes.RollSupreme()
+	return SnackTypes.SupremeList[math.random(1, #SnackTypes.SupremeList)]
 end
 
 -- Gewichteter Zufalls-Drop
