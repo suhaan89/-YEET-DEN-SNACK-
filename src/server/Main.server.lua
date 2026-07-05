@@ -27,6 +27,7 @@ services.RewardService = require(servicesFolder.RewardService)
 services.PetService = require(servicesFolder.PetService)
 services.StyleService = require(servicesFolder.StyleService)
 services.MergeService = require(servicesFolder.MergeService)
+services.DebugService = require(servicesFolder.DebugService)
 
 -- Reihenfolge ist wichtig: Daten -> Spieler -> Map -> Gameplay
 services.DataService.Init()
@@ -41,5 +42,6 @@ services.RewardService.Init(services)
 services.PetService.Init(services)
 services.StyleService.Init(services)
 services.MergeService.Init(services)
+services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
 
 print("🍫 [YEET DEN SNACK] Server bereit – der Truck kommt gleich!")

@@ -82,6 +82,10 @@ local function doRebirth(player: Player)
 	return { ok = true, msg = ("Sugar Rush #%d! Einkommen x%.1f"):format(profile.Rebirths, 1 + profile.Rebirths * Config.RebirthBonus) }
 end
 
+-- Für das Debug-Menü exportiert: nimmt den GANZ NORMALEN Rebirth-Pfad
+-- (DebugService füllt vorher nur das Cash auf – Kostenlogik bleibt unberührt)
+ShopService.DebugDoRebirth = doRebirth
+
 function ShopService.Init(services)
 	DataService = services.DataService
 	PlayerService = services.PlayerService

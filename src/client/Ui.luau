@@ -760,6 +760,83 @@ local function buildSupremeBar()
 	refresh()
 end
 
+-- ══════════ Debug-Menü (nur Entwickler) ══════════
+-- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
+-- Die Buttons kommen komplett vom Server (DebugCommand "list") – neue Commands
+-- im DebugService tauchen hier also automatisch auf, ohne UI-Änderung.
+
+local debugBuilt = false
+
+local function buildDebugMenu()
+	if debugBuilt then
+		return
+	end
+	debugBuilt = true
+
+	local debugRemote = Remotes.Get("DebugCommand") :: RemoteFunction
+
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "DebugToggle"
+	toggle.AnchorPoint = Vector2.new(0, 1)
+	toggle.Position = UDim2.new(0, 12, 1, -12)
+	toggle.Size = UDim2.fromOffset(110, 40)
+	toggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🐞 DEBUG"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local panel = makeWindow("🐞 DEBUG-MENÜ", Vector2.new(320, 140), Color3.fromRGB(255, 120, 120))
+
+	local list = Instance.new("Frame")
+	list.Position = UDim2.new(0, 12, 0, 48)
+	list.Size = UDim2.new(1, -24, 1, -60)
+	list.BackgroundTransparency = 1
+	list.Parent = panel
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.Parent = list
+
+	-- Buttons vom Server generieren lassen
+	task.spawn(function()
+		local ok, commands = pcall(function()
+			return debugRemote:InvokeServer("list")
+		end)
+		if not ok or typeof(commands) ~= "table" then
+			return
+		end
+		panel.Size = UDim2.fromOffset(320, 72 + #commands * 46)
+		for _, cmd in commands do
+			local button = Instance.new("TextButton")
+			button.Size = UDim2.new(1, 0, 0, 40)
+			button.BackgroundColor3 = Color3.fromRGB(70, 60, 90)
+			button.Font = FONT
+			button.TextScaled = true
+			button.Text = cmd.Label
+			button.TextColor3 = Color3.new(1, 1, 1)
+			roundify(button, 10)
+			button.Parent = list
+
+			button.Activated:Connect(function()
+				task.spawn(function()
+					local callOk, result = pcall(function()
+						return debugRemote:InvokeServer(cmd.Id)
+					end)
+					if callOk and typeof(result) == "table" then
+						Ui.Toast((result.ok and "🐞 " or "❌ ") .. result.msg)
+					end
+				end)
+			end)
+		end
+	end)
+
+	toggle.Activated:Connect(function()
+		panel.Visible = not panel.Visible
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -883,6 +960,17 @@ function Ui.Build()
 	buildSupremeBar()
 	buildChargeBar()
 	buildHelp()
+
+	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert
+	if player:GetAttribute("IsDev") then
+		buildDebugMenu()
+	else
+		player:GetAttributeChangedSignal("IsDev"):Connect(function()
+			if player:GetAttribute("IsDev") then
+				buildDebugMenu()
+			end
+		end)
+	end
 end
 
 return Ui
