@@ -11,7 +11,7 @@ local Config = {
 	TruckWarnTime = 10, -- Vorwarnung "DER TRUCK KOMMT!" (Sekunden vorher)
 	TruckSpeed = 55, -- Studs pro Sekunde
 	TruckDropInterval = 0.6, -- Sekunden zwischen zwei Snack-Drops
-	TruckDropZone = 170, -- Snacks fallen nur bei |x| < diesem Wert
+	TruckDropZone = 210, -- Snacks fallen nur bei |x| < diesem Wert
 	TruckFlingForce = 95, -- Wie hart der Truck Spieler wegschleudert
 	TruckFlingUpForce = 55,
 
@@ -59,10 +59,23 @@ local Config = {
 	RebirthBonus = 0.5, -- +50% Einkommen pro Rebirth ("Sugar Rush")
 
 	-- ══ Tresor-Kapazität ══
-	-- Der Tresor hat begrenzte Plätze – mehr gibt's nur durch Rebirths.
+	-- Der Tresor hat begrenzte Plätze – mehr gibt's durch Rebirths und Basis-Ausbau.
 	VaultLimitBase = 20, -- Snack-Plätze ohne Rebirth
 	VaultLimitPerRebirth = 10, -- + Plätze pro Rebirth (macht den Sugar Rush bedeutsamer)
 	VaultFullNotifyCooldown = 3, -- Sekunden zwischen zwei "Tresor voll!"-Meldungen
+
+	-- ══ Basis-Ausbau (Tycoon) ══
+	-- Jeder startet als Camp (Level 1). Ausbauen kostet Cash am grünen Bau-Pad
+	-- der eigenen Basis und bringt Tresor-Plätze + Einkommens-Bonus.
+	-- BonusSlots/IncomeBonus sind GESAMT-Werte des Levels (keine Inkremente).
+	-- Beim Rebirth wird die Basis wieder zum Camp – echter Neuanfang!
+	BaseLevels = {
+		{ Cost = 0, Label = "🏕️ Snack-Camp", BonusSlots = 0, IncomeBonus = 0 },
+		{ Cost = 4000, Label = "🏠 Snack-Hütte", BonusSlots = 5, IncomeBonus = 0.05 },
+		{ Cost = 18000, Label = "🏪 Snack-Lager", BonusSlots = 15, IncomeBonus = 0.12 },
+		{ Cost = 75000, Label = "🏭 Snack-Fabrik", BonusSlots = 30, IncomeBonus = 0.25 },
+		{ Cost = 300000, Label = "🏰 Snack-Imperium", BonusSlots = 50, IncomeBonus = 0.5 },
+	},
 
 	-- ══ Juice & Events ══
 	SweetSpotStart = 0.85, -- Ladung ab hier = PERFEKTER YEET
@@ -88,6 +101,16 @@ local Config = {
 		{ Id = "Drache", Name = "🐉 Kakao-Drache", Cost = 60000, Income = 90, Color = Color3.fromRGB(120, 60, 200), Desc = "Speit heiße Schokolade. +90💰/s" },
 	},
 	PetIncomeTick = 1, -- Sekunden zwischen Pet-Einkommens-Ticks
+
+	-- ══ Style-Shop (Skins) ══
+	-- Ganzkörper-Skins: färben alle Körperteile um (Material/Transparenz inklusive).
+	-- Nur EINER gleichzeitig aktiv, rein kosmetisch.
+	Skins = {
+		{ Id = "Schoko", Name = "🍫 Schoko-Überzug", Cost = 1500, Color = Color3.fromRGB(90, 55, 25), Material = Enum.Material.SmoothPlastic, Desc = "Von Kopf bis Fuß in Schokolade getunkt." },
+		{ Id = "Gummi", Name = "🐻 Gummibärchen", Cost = 8000, Color = Color3.fromRGB(255, 80, 80), Material = Enum.Material.Neon, Transparency = 0.25, Desc = "Halb durchsichtig, voll lecker." },
+		{ Id = "Gold", Name = "🏆 Vergoldet", Cost = 40000, Color = Color3.fromRGB(255, 210, 60), Material = Enum.Material.Metal, Desc = "Protz-Modus: 24 Karat Snack." },
+		{ Id = "Toxic", Name = "☢️ Mutanten-Glibber", Cost = 150000, Color = Color3.fromRGB(110, 255, 40), Material = Enum.Material.Neon, Sparkles = true, Desc = "Direkt aus dem Mutanten-Express gefallen." },
+	},
 
 	-- ══ Style-Shop (Trails) ══
 	-- Rein kosmetische Lauf-Trails hinter dem Charakter. Nur EINER gleichzeitig aktiv.
@@ -133,9 +156,16 @@ function Config.RebirthCost(rebirths: number): number
 	return math.floor(Config.RebirthBaseCost * Config.RebirthCostFactor ^ rebirths)
 end
 
--- Maximale Tresor-Plätze bei `rebirths` Rebirths
-function Config.VaultLimit(rebirths: number): number
-	return Config.VaultLimitBase + rebirths * Config.VaultLimitPerRebirth
+-- Definition eines Basis-Levels (auf den gültigen Bereich geklemmt)
+function Config.BaseLevelDef(level: number)
+	return Config.BaseLevels[math.clamp(level, 1, #Config.BaseLevels)]
+end
+
+-- Maximale Tresor-Plätze bei `rebirths` Rebirths und Basis-Level `baseLevel`
+function Config.VaultLimit(rebirths: number, baseLevel: number?): number
+	return Config.VaultLimitBase
+		+ rebirths * Config.VaultLimitPerRebirth
+		+ Config.BaseLevelDef(baseLevel or 1).BonusSlots
 end
 
 -- Erfolgschance für einen Merge mit `count` gleichen Snacks (Client-Anzeige + Server-Wurf

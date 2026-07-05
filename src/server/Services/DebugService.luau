@@ -37,8 +37,40 @@ local DebugService = {}
 
 local servicesRef -- die komplette Services-Tabelle (in Init verdrahtet)
 
+-- Gruppen-Rang-Checks sind Web-Calls -> Ergebnis pro Spieler cachen
+local groupRankCache: { [Player]: boolean } = {}
+
 local function isDev(player: Player): boolean
-	return RunService:IsStudio() or table.find(Config.DebugUserIds, player.UserId) ~= nil
+	if RunService:IsStudio() then
+		return true
+	end
+	if table.find(Config.DebugUserIds, player.UserId) then
+		return true
+	end
+	-- Der SPIEL-BESITZER ist immer Admin – auch live, ohne Whitelist-Eintrag
+	if game.CreatorType == Enum.CreatorType.User then
+		return player.UserId == game.CreatorId
+	end
+	if game.CreatorType == Enum.CreatorType.Group then
+		if groupRankCache[player] == nil then
+			local isAdmin = false
+			local ok, groups = pcall(function()
+				local GroupService = game:GetService("GroupService")
+				return GroupService:GetGroupsAsync(player.UserId)
+			end)
+			if ok and typeof(groups) == "table" then
+				for _, group in groups do
+					if group.Id == game.CreatorId and group.Rank >= 254 then
+						isAdmin = true -- Besitzer/Admins der Gruppe
+						break
+					end
+				end
+			end
+			groupRankCache[player] = isAdmin
+		end
+		return groupRankCache[player] == true
+	end
+	return false
 end
 
 local COMMANDS = {
@@ -48,6 +80,59 @@ local COMMANDS = {
 		Handler = function(player, services)
 			services.PlayerService.AddCash(player, 10000)
 			return "+10.000💰 aufs Konto!"
+		end,
+	},
+	{
+		Id = "AddCash1M",
+		Label = "🤑 +1 Mio Cash",
+		Handler = function(player, services)
+			services.PlayerService.AddCash(player, 1_000_000)
+			return "+1.000.000💰 – Geld spielt keine Rolle!"
+		end,
+	},
+	{
+		Id = "BaseLevelUp",
+		Label = "⬆️ Basis-Level +1 (gratis)",
+		Handler = function(player, services)
+			local profile = services.DataService.Get(player)
+			if not profile then
+				return "Profil noch nicht geladen..."
+			end
+			if not services.BaseService.GetBaseOf(player) then
+				return "Erst eine Basis beanspruchen!"
+			end
+			if profile.BaseLevel >= #Config.BaseLevels then
+				return "Basis ist schon MAX ausgebaut."
+			end
+			profile.BaseLevel += 1
+			services.BaseService.RefreshBuildout(player)
+			services.PlayerService.Sync(player)
+			return ("Basis-Level %d: %s"):format(profile.BaseLevel, Config.BaseLevelDef(profile.BaseLevel).Label)
+		end,
+	},
+	{
+		Id = "ClearSnacks",
+		Label = "🧹 Lose Snacks aufräumen",
+		Handler = function(_player, services)
+			local count = services.SnackService.ClearLoose()
+			return ("%d lose Snacks entsorgt."):format(count)
+		end,
+	},
+	{
+		Id = "UnlockStyle",
+		Label = "🎨 Alle Skins & Trails freischalten",
+		Handler = function(player, services)
+			local profile = services.DataService.Get(player)
+			if not profile then
+				return "Profil noch nicht geladen..."
+			end
+			for _, def in Config.Skins do
+				profile.Skins[def.Id] = true
+			end
+			for _, def in Config.Trails do
+				profile.Trails[def.Id] = true
+			end
+			return "Alle Skins & Trails gehören dir – Fashion-Show!"
 		end,
 	},
 	{
@@ -141,6 +226,9 @@ function DebugService.Init(services)
 	for _, player in Players:GetPlayers() do
 		mark(player)
 	end
+	Players.PlayerRemoving:Connect(function(player)
+		groupRankCache[player] = nil
+	end)
 end
 
 return DebugService

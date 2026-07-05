@@ -31,7 +31,7 @@ local SnackService, Ragdoll -- in Init verdrahtet
 local announceRemote: RemoteEvent
 local sfxRemote: RemoteEvent
 
-local ROAD_END = 300 -- Start-/End-X der Fahrt
+local ROAD_END = 420 -- Start-/End-X der Fahrt (Straße geht bis ±380, Truck startet dahinter)
 local truckCounter = 0
 
 -- Supreme-Countdown: so viele Trucks noch bis zum Mutanten-Express

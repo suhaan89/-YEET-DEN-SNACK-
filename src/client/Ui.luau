@@ -44,7 +44,9 @@ local shopWindows: { [string]: Frame } = {}
 -- Pet-/Style-Shop: Buttons pro Item + Cache des Server-Stands
 local petRows: { [string]: TextButton } = {}
 local trailRows: { [string]: TextButton } = {}
-local collectionsCache: any = { Pets = {}, EquippedPet = "", Trails = {}, EquippedTrail = "" }
+local skinRows: { [string]: TextButton } = {}
+local collectionsCache: any =
+	{ Pets = {}, EquippedPet = "", Trails = {}, EquippedTrail = "", Skins = {}, EquippedSkin = "" }
 
 -- Merge-Station
 local mergeList: ScrollingFrame
@@ -350,8 +352,27 @@ local function buildShop()
 end
 
 -- ══════════ Pet-Shop & Style-Shop ══════════
--- Beide zeigen Items aus Config (Pets/Trails) mit Kaufen/Ausrüsten-Buttons.
+-- Zeigen Items aus Config (Pets/Trails/Skins) mit Kaufen/Ausrüsten-Buttons.
 -- Besitz & Ausrüstung kommen per GetCollections vom Server (collectionsCache).
+
+-- Buttons einer Item-Liste anhand des Server-Stands einfärben/beschriften
+local function refreshRows(items: { any }, rows: { [string]: TextButton }, ownedMap: any, equippedId: any)
+	for _, def in items do
+		local button = rows[def.Id]
+		if button then
+			if equippedId == def.Id then
+				button.Text = "✓ AKTIV"
+				button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+			elseif ownedMap and ownedMap[def.Id] then
+				button.Text = "AUSRÜSTEN"
+				button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+			else
+				button.Text = formatNumber(def.Cost) .. "💰"
+				button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+			end
+		end
+	end
+end
 
 local function refreshCollectionShops()
 	task.spawn(function()
@@ -362,120 +383,120 @@ local function refreshCollectionShops()
 			return
 		end
 		collectionsCache = data
-
-		for _, def in Config.Pets do
-			local button = petRows[def.Id]
-			if button then
-				if data.EquippedPet == def.Id then
-					button.Text = "✓ AKTIV"
-					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
-				elseif data.Pets and data.Pets[def.Id] then
-					button.Text = "AUSRÜSTEN"
-					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
-				else
-					button.Text = formatNumber(def.Cost) .. "💰"
-					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
-				end
-			end
-		end
-		for _, def in Config.Trails do
-			local button = trailRows[def.Id]
-			if button then
-				if data.EquippedTrail == def.Id then
-					button.Text = "✓ AKTIV"
-					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
-				elseif data.Trails and data.Trails[def.Id] then
-					button.Text = "AUSRÜSTEN"
-					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
-				else
-					button.Text = formatNumber(def.Cost) .. "💰"
-					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
-				end
-			end
-		end
+		refreshRows(Config.Pets, petRows, data.Pets, data.EquippedPet)
+		refreshRows(Config.Trails, trailRows, data.Trails, data.EquippedTrail)
+		refreshRows(Config.Skins, skinRows, data.Skins, data.EquippedSkin)
 	end)
 end
 
--- Generischer Item-Shop (Pets ODER Trails – gleiche Mechanik, andere Remotes)
-local function buildCollectionShop(
-	shopId: string,
-	title: string,
-	titleColor: Color3,
-	items: { any },
-	rows: { [string]: TextButton },
-	buyRemoteName: string,
-	equipRemoteName: string,
-	ownedKey: string,
-	equippedKey: string
-)
-	local frame = makeWindow(title, Vector2.new(440, 90 + #items * 62), titleColor)
+-- Eine Sektion des Collection-Shops (z.B. "Trails" oder "Skins"):
+-- Items + zugehörige Remotes + Schlüssel im collectionsCache
+type ShopSection = {
+	Header: string?,
+	Items: { any },
+	Rows: { [string]: TextButton },
+	BuyRemote: string,
+	EquipRemote: string,
+	OwnedKey: string,
+	EquippedKey: string,
+}
+
+-- Generischer Item-Shop mit beliebig vielen Sektionen (scrollbar)
+local function buildCollectionShop(shopId: string, title: string, titleColor: Color3, sections: { ShopSection })
+	-- Fensterhöhe aus dem Inhalt ableiten, aber auf Bildschirm-tauglich deckeln
+	local contentHeight = 0
+	for _, section in sections do
+		contentHeight += (section.Header and 34 or 0) + #section.Items * 62
+	end
+	local frame = makeWindow(title, Vector2.new(440, math.min(96 + contentHeight, 540)), titleColor)
 	shopWindows[shopId] = frame
 
-	local list = Instance.new("Frame")
+	local list = Instance.new("ScrollingFrame")
 	list.Position = UDim2.new(0, 12, 0, 48)
 	list.Size = UDim2.new(1, -24, 1, -60)
 	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
 	list.Parent = frame
 	local layout = Instance.new("UIListLayout")
 	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
 
-	for _, def in items do
-		local row = Instance.new("Frame")
-		row.Size = UDim2.new(1, 0, 0, 54)
-		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
-		roundify(row, 10)
-		row.Parent = list
+	local order = 0
+	for _, section in sections do
+		if section.Header then
+			order += 1
+			local header = makeLabel(list, {
+				Size = UDim2.new(1, -8, 0, 26),
+				Text = section.Header,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextColor3 = titleColor,
+			})
+			header.LayoutOrder = order
+		end
 
-		makeLabel(row, {
-			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -140, 0, 26),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = def.Name,
-			TextColor3 = def.Color or Color3.new(1, 1, 1),
-		})
-		makeLabel(row, {
-			Position = UDim2.fromOffset(10, 32),
-			Size = UDim2.new(1, -140, 0, 18),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = def.Desc or "",
-			TextColor3 = Color3.fromRGB(190, 190, 200),
-		})
+		for _, def in section.Items do
+			order += 1
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, -8, 0, 54)
+			row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+			row.LayoutOrder = order
+			roundify(row, 10)
+			row.Parent = list
 
-		local button = Instance.new("TextButton")
-		button.AnchorPoint = Vector2.new(1, 0.5)
-		button.Position = UDim2.new(1, -8, 0.5, 0)
-		button.Size = UDim2.fromOffset(115, 38)
-		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
-		button.Font = FONT
-		button.TextScaled = true
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Text = formatNumber(def.Cost) .. "💰"
-		roundify(button, 10)
-		button.Parent = row
-		rows[def.Id] = button
+			makeLabel(row, {
+				Position = UDim2.fromOffset(10, 4),
+				Size = UDim2.new(1, -140, 0, 26),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = def.Name,
+				TextColor3 = def.Color or Color3.new(1, 1, 1),
+			})
+			makeLabel(row, {
+				Position = UDim2.fromOffset(10, 32),
+				Size = UDim2.new(1, -140, 0, 18),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = def.Desc or "",
+				TextColor3 = Color3.fromRGB(190, 190, 200),
+			})
 
-		button.Activated:Connect(function()
-			task.spawn(function()
-				-- Aktion aus dem Cache ableiten: besitzen? ausgerüstet? sonst kaufen.
-				local owned = collectionsCache[ownedKey] and collectionsCache[ownedKey][def.Id]
-				local remoteName, arg
-				if owned and collectionsCache[equippedKey] == def.Id then
-					remoteName, arg = equipRemoteName, "" -- ablegen
-				elseif owned then
-					remoteName, arg = equipRemoteName, def.Id
-				else
-					remoteName, arg = buyRemoteName, def.Id
-				end
-				local ok, result = pcall(function()
-					return (Remotes.Get(remoteName) :: RemoteFunction):InvokeServer(arg)
+			local button = Instance.new("TextButton")
+			button.AnchorPoint = Vector2.new(1, 0.5)
+			button.Position = UDim2.new(1, -8, 0.5, 0)
+			button.Size = UDim2.fromOffset(115, 38)
+			button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+			button.Font = FONT
+			button.TextScaled = true
+			button.TextColor3 = Color3.new(1, 1, 1)
+			button.Text = formatNumber(def.Cost) .. "💰"
+			roundify(button, 10)
+			button.Parent = row
+			section.Rows[def.Id] = button
+
+			button.Activated:Connect(function()
+				task.spawn(function()
+					-- Aktion aus dem Cache ableiten: besitzen? ausgerüstet? sonst kaufen.
+					local owned = collectionsCache[section.OwnedKey] and collectionsCache[section.OwnedKey][def.Id]
+					local remoteName, arg
+					if owned and collectionsCache[section.EquippedKey] == def.Id then
+						remoteName, arg = section.EquipRemote, "" -- ablegen
+					elseif owned then
+						remoteName, arg = section.EquipRemote, def.Id
+					else
+						remoteName, arg = section.BuyRemote, def.Id
+					end
+					local ok, result = pcall(function()
+						return (Remotes.Get(remoteName) :: RemoteFunction):InvokeServer(arg)
+					end)
+					if ok and result then
+						Ui.Toast((result.ok and "✅ " or "❌ ") .. result.msg)
+					end
+					refreshCollectionShops()
 				end)
-				if ok and result then
-					Ui.Toast((result.ok and "✅ " or "❌ ") .. result.msg)
-				end
-				refreshCollectionShops()
 			end)
-		end)
+		end
 	end
 end
 
@@ -878,6 +899,8 @@ local function buildHelp()
 		"👋 [Q] SLAP! Träger verlieren ihren Snack...",
 		"🏦 Tresor-Snacks = Cash/Sekunde – aber die PLÄTZE sind begrenzt!",
 		"🗑️ [R] am eigenen Tresor = billigsten Snack rauswerfen",
+		"⬆️ GRÜNES PAD an deiner Basis = Tycoon-AUSBAU (Plätze + Einkommen!)",
+		"🧍 Skins & Trails gibt's im STYLE-SHOP",
 		"🏪 Shops & Merge-Maschine sind ORTE am Plaza-Rand!",
 		"🧪 Merge: 2+ gleiche Snacks = Chance auf seltener (RISIKO!)",
 		"😈 Fremde Tresore kann man KNACKEN [E halten]",
@@ -936,28 +959,36 @@ function Ui.Build()
 
 	buildCashDisplay()
 	buildShop()
-	buildCollectionShop(
-		"Pets",
-		"🐹 PET-SHOP",
-		Color3.fromRGB(140, 230, 160),
-		Config.Pets,
-		petRows,
-		"BuyPet",
-		"EquipPet",
-		"Pets",
-		"EquippedPet"
-	)
-	buildCollectionShop(
-		"Style",
-		"✨ STYLE-SHOP",
-		Color3.fromRGB(240, 140, 240),
-		Config.Trails,
-		trailRows,
-		"BuyTrail",
-		"EquipTrail",
-		"Trails",
-		"EquippedTrail"
-	)
+	buildCollectionShop("Pets", "🐹 PET-SHOP", Color3.fromRGB(140, 230, 160), {
+		{
+			Items = Config.Pets,
+			Rows = petRows,
+			BuyRemote = "BuyPet",
+			EquipRemote = "EquipPet",
+			OwnedKey = "Pets",
+			EquippedKey = "EquippedPet",
+		},
+	})
+	buildCollectionShop("Style", "✨ STYLE-SHOP", Color3.fromRGB(240, 140, 240), {
+		{
+			Header = "🌀 TRAILS",
+			Items = Config.Trails,
+			Rows = trailRows,
+			BuyRemote = "BuyTrail",
+			EquipRemote = "EquipTrail",
+			OwnedKey = "Trails",
+			EquippedKey = "EquippedTrail",
+		},
+		{
+			Header = "🧍 SKINS",
+			Items = Config.Skins,
+			Rows = skinRows,
+			BuyRemote = "BuySkin",
+			EquipRemote = "EquipSkin",
+			OwnedKey = "Skins",
+			EquippedKey = "EquippedSkin",
+		},
+	})
 	buildMergeUi()
 	buildSupremeBar()
 	buildChargeBar()

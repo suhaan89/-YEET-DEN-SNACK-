@@ -66,13 +66,14 @@ local function doRebirth(player: Player)
 	for name in profile.Upgrades do
 		profile.Upgrades[name] = 0
 	end
+	profile.BaseLevel = 1 -- Tycoon-Ausbau ist auch weg – zurück ins Camp!
 	profile.Rebirths += 1
 	local freed = BaseService.ReleaseVaultSnacks(player)
 
 	PlayerService.Sync(player)
 	PlayerService.ApplySpeed(player)
 	BaseService.RefreshLock(player)
-	BaseService.RefreshDisplay(player) -- Einkommen/s hat sich durch Multiplikator geändert
+	BaseService.RefreshBuildout(player) -- Deko abreißen + Anzeige neu (Multiplikator/Level)
 
 	announceRemote:FireAllClients(
 		("🌟 SUGAR RUSH! %s hat Rebirth #%d erreicht! (+%d%% Einkommen)"):format(

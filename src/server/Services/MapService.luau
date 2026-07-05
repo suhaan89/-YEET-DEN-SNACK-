@@ -157,6 +157,27 @@ local function buildMergeStation(cf: CFrame)
 	sparkles.Parent = cauldron
 end
 
+-- Deko-Baum: Stamm + Kugel-Krone (Platzhalter, macht die größere Map lebendiger)
+local function buildTree(position: Vector3)
+	makePart({
+		Name = "TreeTrunk",
+		Size = Vector3.new(2, 9, 2),
+		Position = position + Vector3.new(0, 4.5, 0),
+		Color = Color3.fromRGB(110, 70, 40),
+		Material = Enum.Material.Wood,
+		CanCollide = true,
+	})
+	local crown = makePart({
+		Name = "TreeCrown",
+		Size = Vector3.new(9, 9, 9),
+		Position = position + Vector3.new(0, 11, 0),
+		Color = Color3.fromRGB(70, 160, 70),
+		Material = Enum.Material.Grass,
+		CanCollide = false,
+	})
+	crown.Shape = Enum.PartType.Ball
+end
+
 -- Baut die Map und gibt die 8 Basis-Slot-CFrames zurück
 function MapService.Build(): { CFrame }
 	workspace.Gravity = Config.Gravity -- floaty Comedy-Physik
@@ -165,10 +186,19 @@ function MapService.Build(): { CFrame }
 	mapFolder.Name = "Map"
 	mapFolder.Parent = workspace
 
-	-- Straße: verläuft von x=-260 bis x=260 bei z=0
+	-- Gras-Boden unter allem (damit die größere Map keine Löcher hat)
+	makePart({
+		Name = "Ground",
+		Size = Vector3.new(950, 1, 560),
+		Position = Vector3.new(0, -0.5, 0),
+		Color = Color3.fromRGB(105, 170, 90),
+		Material = Enum.Material.Grass,
+	})
+
+	-- Straße: verläuft von x=-380 bis x=380 bei z=0
 	makePart({
 		Name = "Road",
-		Size = Vector3.new(520, 0.2, 26),
+		Size = Vector3.new(760, 0.2, 26),
 		Position = Vector3.new(0, 0.1, 0),
 		Color = Color3.fromRGB(60, 60, 60),
 		Material = Enum.Material.Asphalt,
@@ -176,7 +206,7 @@ function MapService.Build(): { CFrame }
 	-- Mittelstreifen
 	makePart({
 		Name = "RoadLine",
-		Size = Vector3.new(520, 0.22, 0.8),
+		Size = Vector3.new(760, 0.22, 0.8),
 		Position = Vector3.new(0, 0.11, 0),
 		Color = Color3.fromRGB(255, 220, 60),
 		Material = Enum.Material.Neon,
@@ -185,7 +215,7 @@ function MapService.Build(): { CFrame }
 	-- Plaza: die zentrale Chaos-Zone, in der die Snacks landen
 	makePart({
 		Name = "Plaza",
-		Size = Vector3.new(140, 0.15, 90),
+		Size = Vector3.new(200, 0.15, 130),
 		Position = Vector3.new(0, 0.08, 0),
 		Color = Color3.fromRGB(230, 190, 140),
 		Material = Enum.Material.WoodPlanks,
@@ -194,39 +224,55 @@ function MapService.Build(): { CFrame }
 	-- SpawnLocation abseits der Straße
 	local spawnLoc = Instance.new("SpawnLocation")
 	spawnLoc.Size = Vector3.new(14, 1, 14)
-	spawnLoc.Position = Vector3.new(0, 0.5, 58)
+	spawnLoc.Position = Vector3.new(0, 0.5, 75)
 	spawnLoc.Color = Color3.fromRGB(120, 200, 255)
 	spawnLoc.Anchored = true
 	spawnLoc.Neutral = true
 	spawnLoc.Duration = Config.SpawnProtection -- kurzer Spawn-Schutz gegen Spawn-Slapping
 	spawnLoc.Parent = mapFolder
 
-	-- 8 Basis-Slots: 4 nördlich (z = -95), 4 südlich (z = +95)
+	-- 8 Basis-Slots: 4 nördlich (z = -120), 4 südlich (z = +120)
 	-- CFrames schauen jeweils Richtung Straße (damit "vorne" zur Action zeigt)
 	-- (CFrame-Blickrichtung ist -Z: Nordreihe muss um 180° gedreht werden)
 	local slots: { CFrame } = {}
-	local xPositions = { -165, -55, 55, 165 }
+	local xPositions = { -210, -70, 70, 210 }
 	for _, x in xPositions do
-		-- Nordreihe (z=-95) schaut nach Süden Richtung Straße
-		table.insert(slots, CFrame.new(x, 0, -95) * CFrame.Angles(0, math.pi, 0))
+		-- Nordreihe (z=-120) schaut nach Süden Richtung Straße
+		table.insert(slots, CFrame.new(x, 0, -120) * CFrame.Angles(0, math.pi, 0))
 	end
 	for _, x in xPositions do
-		-- Südreihe (z=+95) schaut nach Norden Richtung Straße
-		table.insert(slots, CFrame.new(x, 0, 95))
+		-- Südreihe (z=+120) schaut nach Norden Richtung Straße
+		table.insert(slots, CFrame.new(x, 0, 120))
 	end
 
 	-- Shops in den Lücken zwischen den Basen (Front jeweils Richtung Plaza):
-	-- Südseite (z=62, Blick nach Norden = Standard -Z), Nordseite (z=-62, um 180° gedreht)
-	buildShopStand("Upgrade", "🛒 UPGRADE-SHOP", "Shoppen!", Color3.fromRGB(240, 160, 40), CFrame.new(-110, 0, 62))
-	buildShopStand("Pets", "🐹 PET-SHOP", "Pets angucken!", Color3.fromRGB(90, 200, 120), CFrame.new(110, 0, 62))
+	-- Südseite (z=80, Blick nach Norden = Standard -Z), Nordseite (z=-80, um 180° gedreht)
+	buildShopStand("Upgrade", "🛒 UPGRADE-SHOP", "Shoppen!", Color3.fromRGB(240, 160, 40), CFrame.new(-140, 0, 80))
+	buildShopStand("Pets", "🐹 PET-SHOP", "Pets angucken!", Color3.fromRGB(90, 200, 120), CFrame.new(140, 0, 80))
 	buildShopStand(
 		"Style",
 		"✨ STYLE-SHOP",
 		"Stylen!",
 		Color3.fromRGB(220, 100, 220),
-		CFrame.new(-110, 0, -62) * CFrame.Angles(0, math.pi, 0)
+		CFrame.new(-140, 0, -80) * CFrame.Angles(0, math.pi, 0)
 	)
-	buildMergeStation(CFrame.new(110, 0, -62) * CFrame.Angles(0, math.pi, 0))
+	buildMergeStation(CFrame.new(140, 0, -80) * CFrame.Angles(0, math.pi, 0))
+
+	-- Ein paar Bäume an den Map-Rändern (reine Deko)
+	for _, pos in {
+		Vector3.new(-290, 0, -60),
+		Vector3.new(-290, 0, 60),
+		Vector3.new(290, 0, -60),
+		Vector3.new(290, 0, 60),
+		Vector3.new(-140, 0, -180),
+		Vector3.new(140, 0, -180),
+		Vector3.new(-140, 0, 180),
+		Vector3.new(140, 0, 180),
+		Vector3.new(0, 0, -190),
+		Vector3.new(0, 0, 190),
+	} do
+		buildTree(pos)
+	end
 
 	return slots
 end

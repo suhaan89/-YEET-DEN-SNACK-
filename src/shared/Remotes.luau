@@ -24,6 +24,8 @@ local FUNCTIONS = {
 	"EquipPet", -- Client -> Server: Pet ausrüsten/ablegen (petId oder ""), gibt {ok, msg} zurück
 	"BuyTrail", -- Client -> Server: Trail kaufen (trailId), gibt {ok, msg} zurück
 	"EquipTrail", -- Client -> Server: Trail ausrüsten/ablegen (trailId oder ""), gibt {ok, msg} zurück
+	"BuySkin", -- Client -> Server: Charakter-Skin kaufen (skinId), gibt {ok, msg} zurück
+	"EquipSkin", -- Client -> Server: Skin anziehen/ablegen (skinId oder ""), gibt {ok, msg} zurück
 	"GetCollections", -- Client -> Server: eigene Pets/Trails + Ausrüstung abfragen
 	"GetVault", -- Client -> Server: eigenen Tresor-Inhalt abfragen (Liste von Snack-Namen)
 	"DoMerge", -- Client -> Server: Merge versuchen (snackName, count), gibt {ok, success?, msg} zurück

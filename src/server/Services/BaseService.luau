@@ -6,9 +6,14 @@
 	Basen werden NICHT automatisch zugewiesen: Neue Spieler laufen zu einer
 	freien Basis und beanspruchen sie per ProximityPrompt am Tresor.
 
-	Der Tresor hat begrenzte Plätze (Config.VaultLimit, steigt mit Rebirths).
-	Ist er voll, wird nichts mehr eingelagert – der Besitzer kann am eigenen
-	Tresor per [R] den billigsten Snack rauswerfen, um Platz zu schaffen.
+	Der Tresor hat begrenzte Plätze (Config.VaultLimit, steigt mit Rebirths
+	und Basis-Ausbau). Ist er voll, wird nichts mehr eingelagert – der Besitzer
+	kann am eigenen Tresor per [R] den billigsten Snack rauswerfen.
+
+	Tycoon-Ausbau: Am grünen Bau-Pad neben dem Tresor kauft der Besitzer
+	Ausbaustufen (Config.BaseLevels) – mehr Tresor-Plätze, Einkommens-Bonus
+	und sichtbare Deko (Zaun, Fahnen, Gold-Tresor, Imperiums-Leuchtsäule).
+	Beim Rebirth fällt die Basis zurück auf Level 1.
 
 	Jede Basis:
 	- Floor      = farbige Bodenplatte
@@ -34,6 +39,7 @@ local playerToBase: { [Player]: any } = {}
 
 local announceRemote: RemoteEvent
 local notifyRemote: RemoteEvent
+local sfxRemote: RemoteEvent
 
 local BASE_COLORS = {
 	Color3.fromRGB(255, 130, 130),
@@ -60,6 +66,32 @@ local function getVaultIncome(player: Player): number
 		end
 	end
 	return income
+end
+
+-- Gesamteinkommen/s aus dem Tresor: Snacks × Rebirth-Multiplikator × Ausbau-Bonus
+local function getTotalIncome(player: Player): number
+	local profile = DataService.Get(player)
+	local bonus = Config.BaseLevelDef(profile and profile.BaseLevel or 1).IncomeBonus
+	return getVaultIncome(player) * DataService.GetMultiplier(player) * (1 + bonus)
+end
+
+-- Kurzer Konfetti-Burst (Beanspruchen, Ausbau, Tresor-Explosion)
+local function confettiBurst(part: BasePart, color: Color3, amount: number)
+	local attachment = Instance.new("Attachment")
+	attachment.Position = Vector3.new(0, part.Size.Y / 2 + 1, 0)
+	attachment.Parent = part
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Color = ColorSequence.new(color)
+	emitter.Speed = NumberRange.new(15, 32)
+	emitter.Lifetime = NumberRange.new(0.6, 1.3)
+	emitter.SpreadAngle = Vector2.new(70, 70)
+	emitter.Size = NumberSequence.new(0.7)
+	emitter.Rate = 0
+	emitter.Parent = attachment
+	emitter:Emit(amount)
+	task.delay(2, function()
+		attachment:Destroy()
+	end)
 end
 
 -- Eingelagerte Snacks als Mini-Modelle auf der Basis anzeigen (max. 24):
@@ -102,14 +134,127 @@ local function updateDisplay(base)
 	local owner = base.Owner
 	if owner then
 		local profile = DataService.Get(owner)
+		local level = profile and profile.BaseLevel or 1
+		local levelDef = Config.BaseLevelDef(level)
 		local count = profile and #profile.Vault or 0
-		local limit = Config.VaultLimit(profile and profile.Rebirths or 0)
-		local income = math.floor(getVaultIncome(owner) * DataService.GetMultiplier(owner))
-		base.NameLabel.Text = "🏠 " .. owner.Name
+		local limit = Config.VaultLimit(profile and profile.Rebirths or 0, level)
+		local income = math.floor(getTotalIncome(owner))
+		base.NameLabel.Text = ("%s  %s"):format(levelDef.Label, owner.Name)
 		base.InfoLabel.Text = ("🍫 %d/%d Snacks  |  %d💰/s"):format(count, limit, income)
+
+		-- Bau-Pad-Anzeige: nächste Ausbaustufe oder MAX
+		local nextDef = Config.BaseLevels[level + 1]
+		if nextDef then
+			base.BuildLabel.Text = ("⬆️ %s – %d💰\n+%d Plätze, +%d%% Einkommen"):format(
+				nextDef.Label,
+				nextDef.Cost,
+				nextDef.BonusSlots - levelDef.BonusSlots,
+				(nextDef.IncomeBonus - levelDef.IncomeBonus) * 100
+			)
+		else
+			base.BuildLabel.Text = "👑 MAX AUSGEBAUT!"
+		end
 	else
 		base.NameLabel.Text = "FREIE BASIS"
 		base.InfoLabel.Text = "Hinlaufen & [E] drücken!"
+		base.BuildLabel.Text = ""
+	end
+end
+
+-- ══════════ Tycoon-Buildout (sichtbare Deko pro Ausbaustufe) ══════════
+
+local function updateBuildout(base)
+	base.DecoFolder:ClearAllChildren()
+
+	local owner = base.Owner
+	local profile = owner and DataService.Get(owner)
+	local level = profile and profile.BaseLevel or 1
+
+	-- Tresor-Optik: ab Level 4 wird er GOLDEN
+	if owner and level >= 4 then
+		base.Vault.Color = Color3.fromRGB(255, 210, 60)
+		base.Vault.Material = Enum.Material.Metal
+	else
+		base.Vault.Color = Color3.fromRGB(80, 80, 90)
+		base.Vault.Material = Enum.Material.DiamondPlate
+	end
+
+	if not owner or level < 2 then
+		return
+	end
+	local color = BASE_COLORS[base.Index] or FREE_COLOR
+
+	local function deco(props: { [string]: any }): Part
+		local part = Instance.new("Part")
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanQuery = false
+		part.CanTouch = false
+		for key, value in props do
+			(part :: any)[key] = value
+		end
+		part.Parent = base.DecoFolder
+		return part
+	end
+
+	-- Level 2: Zaun-Pfosten an drei Seiten (vorne bleibt offen für YEETs)
+	local postPositions = {}
+	for _, x in { -20, -10, 0, 10, 20 } do
+		table.insert(postPositions, Vector3.new(x, 0, 20)) -- hinten
+	end
+	for _, z in { -12, -4, 4, 12 } do
+		table.insert(postPositions, Vector3.new(-20, 0, z)) -- links
+		table.insert(postPositions, Vector3.new(20, 0, z)) -- rechts
+	end
+	for _, pos in postPositions do
+		deco({
+			Size = Vector3.new(1, 4.5, 1),
+			CFrame = base.Slot * CFrame.new(pos.X, 3.25, pos.Z),
+			Color = color,
+			Material = Enum.Material.SmoothPlastic,
+		})
+	end
+
+	-- Level 3: Neon-Fahnenmasten an den vorderen Ecken
+	if level >= 3 then
+		for _, x in { -20, 20 } do
+			deco({
+				Size = Vector3.new(0.6, 12, 0.6),
+				CFrame = base.Slot * CFrame.new(x, 7, -20),
+				Color = Color3.fromRGB(200, 200, 210),
+				Material = Enum.Material.Metal,
+			})
+			deco({
+				Size = Vector3.new(4, 2.5, 0.3),
+				CFrame = base.Slot * CFrame.new(x + (x < 0 and 2.2 or -2.2), 11.5, -20),
+				Color = color,
+				Material = Enum.Material.Neon,
+			})
+		end
+	end
+
+	-- Level 4: "Roter Teppich" (Neon-Landebahn) von vorne bis zum Gold-Tresor
+	if level >= 4 then
+		deco({
+			Size = Vector3.new(5, 0.12, 32),
+			CFrame = base.Slot * CFrame.new(0, 1.08, -3),
+			Color = Color3.fromRGB(255, 210, 60),
+			Material = Enum.Material.Neon,
+		})
+	end
+
+	-- Level 5: Imperiums-Leuchtsäule + Sparkles überm Tresor (sieht JEDER auf der Map)
+	if level >= 5 then
+		local pillar = deco({
+			Size = Vector3.new(2.5, 60, 2.5),
+			CFrame = base.Slot * CFrame.new(0, 38, 14),
+			Color = color,
+			Material = Enum.Material.Neon,
+			Transparency = 0.45,
+		})
+		local sparkles = Instance.new("Sparkles")
+		sparkles.SparkleColor = Color3.fromRGB(255, 210, 60)
+		sparkles.Parent = pillar
 	end
 end
 
@@ -207,10 +352,50 @@ local function buildBase(index: number, slot: CFrame)
 	dropPrompt.Enabled = false
 	dropPrompt.Parent = vault
 
+	-- Grünes Bau-Pad neben dem Tresor: hier kauft der Besitzer den Tycoon-Ausbau
+	local buildPad = Instance.new("Part")
+	buildPad.Name = "BuildPad"
+	buildPad.Anchored = true
+	buildPad.Shape = Enum.PartType.Cylinder
+	buildPad.Size = Vector3.new(0.5, 7, 7)
+	buildPad.CFrame = slot * CFrame.new(11, 1.25, 14) * CFrame.Angles(0, 0, math.rad(90))
+	buildPad.Color = Color3.fromRGB(80, 210, 120)
+	buildPad.Material = Enum.Material.Neon
+	buildPad.Parent = folder
+
+	local buildBillboard = Instance.new("BillboardGui")
+	buildBillboard.Size = UDim2.fromOffset(230, 54)
+	buildBillboard.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
+	buildBillboard.MaxDistance = 90
+	local buildLabel = Instance.new("TextLabel")
+	buildLabel.Size = UDim2.fromScale(1, 1)
+	buildLabel.BackgroundTransparency = 1
+	buildLabel.Text = ""
+	buildLabel.TextScaled = true
+	buildLabel.Font = Enum.Font.FredokaOne
+	buildLabel.TextColor3 = Color3.fromRGB(160, 255, 190)
+	buildLabel.TextStrokeTransparency = 0.2
+	buildLabel.Parent = buildBillboard
+	buildBillboard.Parent = buildPad
+
+	local buildPrompt = Instance.new("ProximityPrompt")
+	buildPrompt.ActionText = "Basis ausbauen!"
+	buildPrompt.ObjectText = "Ausbau"
+	buildPrompt.HoldDuration = 0.3
+	buildPrompt.MaxActivationDistance = 9
+	buildPrompt.RequiresLineOfSight = false
+	buildPrompt.Enabled = false
+	buildPrompt.Parent = buildPad
+
 	-- Ordner für die Mini-Snack-Anzeige (der sichtbare Hort)
 	local hoardFolder = Instance.new("Folder")
 	hoardFolder.Name = "Hoard"
 	hoardFolder.Parent = folder
+
+	-- Ordner für die Tycoon-Ausbau-Deko (Zaun, Fahnen, ...)
+	local decoFolder = Instance.new("Folder")
+	decoFolder.Name = "Deco"
+	decoFolder.Parent = folder
 
 	folder.Parent = workspace:FindFirstChild("Map") or workspace
 
@@ -224,9 +409,12 @@ local function buildBase(index: number, slot: CFrame)
 		Prompt = prompt,
 		ClaimPrompt = claimPrompt,
 		DropPrompt = dropPrompt,
+		BuildPrompt = buildPrompt,
+		BuildLabel = buildLabel,
 		NameLabel = nameLabel,
 		InfoLabel = infoLabel,
 		HoardFolder = hoardFolder,
+		DecoFolder = decoFolder,
 		LastCrack = 0,
 	}
 	zoneToBase[zone] = base
@@ -248,6 +436,10 @@ local function buildBase(index: number, slot: CFrame)
 
 	dropPrompt.Triggered:Connect(function(player)
 		BaseService.TryDropSnack(player, base)
+	end)
+
+	buildPrompt.Triggered:Connect(function(player)
+		BaseService.TryUpgradeBase(player, base)
 	end)
 
 	updateDisplay(base)
@@ -314,7 +506,7 @@ function BaseService.AddToVault(owner: Player, snackName: string): boolean
 	if not profile then
 		return false
 	end
-	if #profile.Vault >= Config.VaultLimit(profile.Rebirths) then
+	if #profile.Vault >= Config.VaultLimit(profile.Rebirths, profile.BaseLevel) then
 		return false
 	end
 	table.insert(profile.Vault, snackName)
@@ -367,7 +559,7 @@ function BaseService.TryDropSnack(player: Player, base)
 		("🗑️ '%s' rausgeworfen! (%d/%d Plätze belegt)"):format(
 			snackName,
 			#profile.Vault,
-			Config.VaultLimit(profile.Rebirths)
+			Config.VaultLimit(profile.Rebirths, profile.BaseLevel)
 		)
 	)
 end
@@ -387,6 +579,9 @@ function BaseService.ReleaseVaultSnacks(player: Player): number
 	local base = playerToBase[player]
 	if base then
 		updateDisplay(base)
+		-- Explosions-Effekt: der Tresor "platzt" sichtbar auf
+		confettiBurst(base.Vault, Color3.fromRGB(255, 220, 80), 80)
+		sfxRemote:FireAllClients("explosion", base.Vault.Position)
 		local outward = base.Slot.LookVector -- lokales -Z = Richtung Straße
 		for i, snackName in released do
 			local def = SnackTypes.ByName[snackName]
@@ -423,6 +618,58 @@ function BaseService.ReleaseVaultSnacks(player: Player): number
 		end
 	end
 	return #released
+end
+
+-- Tycoon-Ausbau kaufen (am Bau-Pad der eigenen Basis)
+function BaseService.TryUpgradeBase(player: Player, base)
+	if player ~= base.Owner then
+		notifyRemote:FireClient(player, "😅 Das ist nicht deine Basis – bau deine eigene aus!")
+		return
+	end
+	local profile = DataService.Get(player)
+	if not profile then
+		return
+	end
+	local level = profile.BaseLevel or 1
+	local nextDef = Config.BaseLevels[level + 1]
+	if not nextDef then
+		notifyRemote:FireClient(player, "👑 Deine Basis ist schon MAXIMAL ausgebaut!")
+		return
+	end
+	if not PlayerService.TrySpend(player, nextDef.Cost) then
+		notifyRemote:FireClient(player, ("Zu wenig Cash! Der Ausbau kostet %d💰."):format(nextDef.Cost))
+		return
+	end
+
+	profile.BaseLevel = level + 1
+	updateBuildout(base)
+	updateDisplay(base)
+	PlayerService.Sync(player) -- VaultLimit-Attribut aktualisieren
+	confettiBurst(base.Vault, BASE_COLORS[base.Index] or FREE_COLOR, 60)
+	sfxRemote:FireAllClients("ding", base.Vault.Position)
+	notifyRemote:FireClient(
+		player,
+		("⬆️ Ausbau fertig: %s! (+%d Tresor-Plätze, +%d%% Einkommen)"):format(
+			nextDef.Label,
+			nextDef.BonusSlots - Config.BaseLevelDef(level).BonusSlots,
+			(nextDef.IncomeBonus - Config.BaseLevelDef(level).IncomeBonus) * 100
+		)
+	)
+	if profile.BaseLevel >= #Config.BaseLevels then
+		announceRemote:FireAllClients(
+			("🏰 %s hat das SNACK-IMPERIUM errichtet! Verneigt euch!!"):format(player.Name),
+			"Mythic"
+		)
+	end
+end
+
+-- Buildout + Anzeige neu aufbauen (z.B. nach Rebirth-Reset des Basis-Levels)
+function BaseService.RefreshBuildout(player: Player)
+	local base = playerToBase[player]
+	if base then
+		updateBuildout(base)
+		updateDisplay(base)
+	end
 end
 
 -- Schloss-Upgrade anwenden: Diebe brauchen länger
@@ -467,15 +714,19 @@ function BaseService.TryClaim(player: Player, base)
 	base.Zone.Color = color
 	base.Prompt.Enabled = true
 	base.DropPrompt.Enabled = true
+	base.BuildPrompt.Enabled = true
 	base.ClaimPrompt.Enabled = false
 	-- Für den Heimweg-Pfeil auf dem Client
 	player:SetAttribute("VaultPos", base.Vault.Position)
 	notifyRemote:FireClient(player, "🏠 Das ist jetzt DEINE Basis! YEETe Snacks in die Zone!")
-	-- Anzeige erst aktualisieren, wenn die Daten geladen sind
+	confettiBurst(base.Vault, color, 40)
+	sfxRemote:FireAllClients("ding", base.Vault.Position)
+	-- Anzeige/Ausbau erst aktualisieren, wenn die Daten geladen sind
 	task.spawn(function()
 		DataService.WaitFor(player)
 		if base.Owner == player then
 			updateDisplay(base)
+			updateBuildout(base)
 			BaseService.RefreshLock(player)
 		end
 	end)
@@ -489,9 +740,11 @@ local function releaseBase(player: Player)
 		base.Zone.Color = FREE_COLOR
 		base.Prompt.Enabled = false
 		base.DropPrompt.Enabled = false
+		base.BuildPrompt.Enabled = false
 		base.ClaimPrompt.Enabled = true
 		playerToBase[player] = nil
 		updateDisplay(base)
+		updateBuildout(base) -- Deko + Gold-Tresor zurücksetzen
 	end
 end
 
@@ -504,6 +757,7 @@ function BaseService.Init(services)
 
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	notifyRemote = Remotes.Get("Notify") :: RemoteEvent
+	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent
 
 	for index, slot in services.MapSlots do
 		table.insert(bases, buildBase(index, slot))
@@ -529,7 +783,7 @@ function BaseService.Init(services)
 		while true do
 			task.wait(Config.IncomeTick)
 			for player, base in playerToBase do
-				local income = getVaultIncome(player) * DataService.GetMultiplier(player)
+				local income = getTotalIncome(player)
 				if income > 0 then
 					PlayerService.AddCash(player, income * Config.IncomeTick)
 				end

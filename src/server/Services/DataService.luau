@@ -29,6 +29,9 @@ local function defaultProfile()
 		EquippedPet = "", -- Id des ausgerüsteten Pets ("" = keins)
 		Trails = {}, -- gekaufte Trails: { [trailId] = true }
 		EquippedTrail = "", -- Id des aktiven Trails ("" = keiner)
+		Skins = {}, -- gekaufte Charakter-Skins: { [skinId] = true }
+		EquippedSkin = "", -- Id des aktiven Skins ("" = keiner)
+		BaseLevel = 1, -- Tycoon-Ausbaustufe der Basis (Index in Config.BaseLevels)
 	}
 end
 

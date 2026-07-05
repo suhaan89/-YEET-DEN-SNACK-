@@ -35,6 +35,14 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
    damit die eigene Zone sie nicht sofort wieder einsaugt) – Chaos-Moment!
 10. 🏠 Basen werden **nicht automatisch zugewiesen**: Neue Spieler suchen sich
    eine FREIE BASIS aus und beanspruchen sie per [E] am Tresor.
+11. ⬆️ **Tycoon-Ausbau**: Am grünen Bau-Pad der eigenen Basis kauft man
+   Ausbaustufen (Camp → Hütte → Lager → Fabrik → Imperium, `Config.BaseLevels`):
+   mehr Tresor-Plätze, Einkommens-Bonus und sichtbare Deko (Zaun, Fahnen,
+   Gold-Tresor, Leuchtsäule). Rebirth setzt den Ausbau zurück auf Camp.
+12. 🧍 **Skins** im Style-Shop: Ganzkörper-Umfärbung (Schoko, Gummibärchen,
+   Gold, Mutanten-Glibber) – rein kosmetisch, überlebt Respawns.
+13. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
+   Spiel-Besitzer (bzw. Gruppen-Rang ≥254) + UserIds aus `Config.DebugUserIds`.
 
 ## Entwicklung
 
@@ -68,6 +76,10 @@ src/server/   → ServerScriptService.Server
   Services/TruckService    Truck-Event (räumliche Abfragen statt .Touched!), Rush Hour
   Services/ShopService     Upgrades + Rebirth (serverseitig validiert)
   Services/RewardService   Spielzeit-Geschenke (alle 4 Min ein Snack in den Tresor)
+  Services/PetService      Pets (passive Einkommens-Begleiter) + GetCollections-Remote
+  Services/StyleService    Trails + Ganzkörper-Skins (kosmetisch)
+  Services/MergeService    Merge-Maschine (2+ gleiche Snacks -> Chance auf seltener)
+  Services/DebugService    Admin-/Test-Menü (Studio, Spiel-Besitzer, Whitelist)
 
 src/client/   → StarterPlayerScripts
   init.client.luau  Input (YEET-Aufladung, Slap), Fling-Handler, Kamera-Shake,

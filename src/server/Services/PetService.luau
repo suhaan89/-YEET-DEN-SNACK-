@@ -116,7 +116,7 @@ local function equipPet(player: Player, petId: any)
 	return { ok = true, msg = ("%s trottet jetzt hinter dir her!"):format(def.Name) }
 end
 
--- Pets + Trails in einem Rutsch (fürs Shop-UI)
+-- Pets + Trails + Skins in einem Rutsch (fürs Shop-UI)
 local function getCollections(player: Player)
 	local profile = DataService.Get(player)
 	if not profile then
@@ -127,6 +127,8 @@ local function getCollections(player: Player)
 		EquippedPet = profile.EquippedPet,
 		Trails = profile.Trails,
 		EquippedTrail = profile.EquippedTrail,
+		Skins = profile.Skins,
+		EquippedSkin = profile.EquippedSkin,
 	}
 end
 

@@ -65,12 +65,67 @@ local function destroyOldestLoose()
 	end
 end
 
+-- ══════════ Trage-Pose (prozedural, ohne Animations-Assets) ══════════
+-- Beide Arme nach oben strecken, solange der Snack überm Kopf schwebt.
+-- Funktioniert für R6 (Schulter-Motoren im Torso) und R15 (in den UpperArms).
+
+local function findShoulders(character: Model): { Motor6D }
+	local motors: { Motor6D } = {}
+	local torso = character:FindFirstChild("Torso")
+	if torso then -- R6
+		for _, name in { "Left Shoulder", "Right Shoulder" } do
+			local motor = torso:FindFirstChild(name)
+			if motor and motor:IsA("Motor6D") then
+				table.insert(motors, motor)
+			end
+		end
+	else -- R15
+		for _, pair in { { "LeftUpperArm", "LeftShoulder" }, { "RightUpperArm", "RightShoulder" } } do
+			local arm = character:FindFirstChild(pair[1])
+			local motor = arm and arm:FindFirstChild(pair[2])
+			if motor and motor:IsA("Motor6D") then
+				table.insert(motors, motor :: Motor6D)
+			end
+		end
+	end
+	return motors
+end
+
+-- Original-C0s merken, damit die Arme nach dem Wurf wieder runterkommen
+local function applyCarryPose(entry, character: Model)
+	local pose: { [Motor6D]: CFrame } = {}
+	local isR6 = character:FindFirstChild("Torso") ~= nil
+	for _, motor in findShoulders(character) do
+		pose[motor] = motor.C0
+		if isR6 then
+			motor.C0 = motor.C0 * CFrame.Angles(0, 0, math.pi) -- R6: um Z hochklappen
+		else
+			motor.C0 = motor.C0 * CFrame.Angles(math.rad(170), 0, 0) -- R15: um X hochklappen
+		end
+	end
+	entry.CarryPose = pose
+end
+
+local function clearCarryPose(entry)
+	local pose = entry.CarryPose
+	entry.CarryPose = nil
+	if not pose then
+		return
+	end
+	for motor, c0 in pose do
+		if motor.Parent then
+			motor.C0 = c0
+		end
+	end
+end
+
 -- Snack wieder "loose" machen (nach Wurf, Drop, Tod, Slap)
 local function release(entry, velocity: Vector3?)
 	local player = entry.Holder
 	entry.State = "Loose"
 	entry.Holder = nil
 	entry.SpawnedAt = os.clock() -- Despawn-Timer neu starten
+	clearCarryPose(entry) -- Arme wieder runter
 
 	if entry.Weld then
 		entry.Weld:Destroy()
@@ -268,6 +323,7 @@ function SnackService.SpawnSnack(def, position: Vector3, velocity: Vector3?, noB
 	-- Eintrag aufräumen, sonst leakt die entries-Tabelle und das Snack-Limit stimmt nicht mehr
 	part.Destroying:Connect(function()
 		entries[part] = nil
+		clearCarryPose(entry)
 		local holder = entry.Holder
 		if holder and held[holder] == entry then
 			held[holder] = nil
@@ -281,10 +337,25 @@ function SnackService.SpawnSnack(def, position: Vector3, velocity: Vector3?, noB
 	if velocity then
 		part.AssemblyLinearVelocity = velocity
 	end
+	-- Lustiges Trudeln beim Spawnen (fliegende Snacks rotieren komisch)
+	part.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), math.random(-8, 8), math.random(-8, 8))
 	pcall(function()
 		part:SetNetworkOwner(nil)
 	end)
 	return part
+end
+
+-- Debug/Admin: alle losen Snacks despawnen, gibt die Anzahl zurück
+function SnackService.ClearLoose(): number
+	local count = 0
+	for part, entry in entries do
+		if entry.State == "Loose" then
+			entries[part] = nil
+			part:Destroy()
+			count += 1
+		end
+	end
+	return count
 end
 
 function SnackService.SpawnRandom(position: Vector3, velocity: Vector3?): BasePart
@@ -327,6 +398,9 @@ function SnackService.TryGrab(player: Player, entry)
 
 	player:SetAttribute("HoldingSnack", true)
 	player:SetAttribute("HeldSnackName", def.Name)
+
+	-- Arme hoch – man sieht jedem SOFORT an, dass er Beute trägt
+	applyCarryPose(entry, character :: Model)
 
 	-- Schwere Snacks machen langsam
 	PlayerService.ApplySpeed(player)
@@ -546,10 +620,10 @@ function SnackService.Init(services)
 					entries[part] = nil
 					part:Destroy()
 				elseif part.Position.Y < -30 then
-					-- Runtergefallen? Zurück in die Chaos-Zone!
+					-- Runtergefallen? Zurück in die Chaos-Zone! (Bereich = Plaza-Größe)
 					part.AssemblyLinearVelocity = Vector3.zero
 					part.AssemblyAngularVelocity = Vector3.zero
-					part.CFrame = CFrame.new(math.random(-60, 60), 10, math.random(-38, 38))
+					part.CFrame = CFrame.new(math.random(-90, 90), 10, math.random(-55, 55))
 				end
 			end
 		end
