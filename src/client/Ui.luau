@@ -706,6 +706,60 @@ function Ui.SetCharge(fraction: number)
 	end
 end
 
+-- ══════════ Supreme-Truck-Fortschritt ══════════
+-- Zeigt, wie viele Trucks es noch bis zum Mutanten-Express sind.
+-- Datenquelle: Workspace-Attribute (setzt der TruckService, replizieren automatisch).
+
+local function buildSupremeBar()
+	local frame = Instance.new("Frame")
+	frame.Name = "SupremeProgress"
+	frame.Position = UDim2.new(0, 12, 0, 66) -- sitzt da, wo früher der Shop-Button war
+	frame.Size = UDim2.fromOffset(190, 48)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+	frame.BackgroundTransparency = 0.25
+	roundify(frame, 12)
+	frame.Parent = gui
+
+	local label = makeLabel(frame, {
+		Position = UDim2.fromOffset(8, 4),
+		Size = UDim2.new(1, -16, 0, 20),
+		Text = "☢️ Supreme-Truck: ???",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(150, 255, 90),
+	})
+
+	local barBg = Instance.new("Frame")
+	barBg.Position = UDim2.new(0, 8, 0, 30)
+	barBg.Size = UDim2.new(1, -16, 0, 10)
+	barBg.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	roundify(barBg, 5)
+	barBg.Parent = frame
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(110, 255, 40)
+	roundify(fill, 5)
+	fill.Parent = barBg
+
+	local function refresh()
+		local left = workspace:GetAttribute("SupremeTrucksLeft")
+		local target = workspace:GetAttribute("SupremeTrucksTarget")
+		if typeof(left) ~= "number" or typeof(target) ~= "number" or target <= 0 then
+			return
+		end
+		if left <= 0 then
+			label.Text = "☢️ MUTANTEN-EXPRESS KOMMT!"
+		else
+			label.Text = ("☢️ Supreme-Truck: noch %d"):format(left)
+		end
+		fill.Size = UDim2.fromScale(math.clamp(1 - left / target, 0, 1), 1)
+	end
+
+	workspace:GetAttributeChangedSignal("SupremeTrucksLeft"):Connect(refresh)
+	workspace:GetAttributeChangedSignal("SupremeTrucksTarget"):Connect(refresh)
+	refresh()
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -826,6 +880,7 @@ function Ui.Build()
 		"EquippedTrail"
 	)
 	buildMergeUi()
+	buildSupremeBar()
 	buildChargeBar()
 	buildHelp()
 end

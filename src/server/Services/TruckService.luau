@@ -8,8 +8,13 @@
 	statt .Touched – ein per CFrame bewegtes, verankertes Teil feuert
 	Touched nämlich NICHT zuverlässig.
 
-	Special: Jeder Config.RushHourEvery-te Truck ist eine RUSH HOUR –
-	zwei Trucks aus beiden Richtungen gleichzeitig!
+	Specials:
+	- Jeder Config.RushHourEvery-te Truck ist eine RUSH HOUR –
+	  zwei Trucks aus beiden Richtungen gleichzeitig!
+	- Im Schnitt alle ~100 Trucks (Config.SupremeTrucksMin..Max) kommt statt
+	  des normalen Trucks der MUTANTEN-EXPRESS und droppt Supreme-Snacks.
+	  Countdown repliziert über Workspace-Attribute "SupremeTrucksLeft"/
+	  "SupremeTrucksTarget" (die Ui zeigt daraus die Fortschrittsleiste).
 ]]
 
 local RunService = game:GetService("RunService")
@@ -17,6 +22,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local SnackTypes = require(ReplicatedStorage.Shared.SnackTypes)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local TruckService = {}
@@ -28,16 +34,28 @@ local sfxRemote: RemoteEvent
 local ROAD_END = 300 -- Start-/End-X der Fahrt
 local truckCounter = 0
 
--- Baut das Platzhalter-Truck-Modell (später durch echtes Modell ersetzen)
-local function buildTruck(): Model
+-- Supreme-Countdown: so viele Trucks noch bis zum Mutanten-Express
+local supremeTarget = 0
+local supremeLeft = 0
+
+local function rollSupremeCountdown()
+	supremeTarget = math.random(Config.SupremeTrucksMin, Config.SupremeTrucksMax)
+	supremeLeft = supremeTarget
+	workspace:SetAttribute("SupremeTrucksTarget", supremeTarget)
+	workspace:SetAttribute("SupremeTrucksLeft", supremeLeft)
+end
+
+-- Baut das Platzhalter-Truck-Modell (später durch echtes Modell ersetzen).
+-- isSupreme = giftgrüner MUTANTEN-EXPRESS statt Schoko-Optik.
+local function buildTruck(isSupreme: boolean?): Model
 	local model = Instance.new("Model")
-	model.Name = "SchokoTruck"
+	model.Name = if isSupreme then "MutantenExpress" else "SchokoTruck"
 
 	local body = Instance.new("Part")
 	body.Name = "Body"
 	body.Size = Vector3.new(22, 9, 9)
-	body.Color = Color3.fromRGB(92, 51, 23) -- Schokobraun
-	body.Material = Enum.Material.SmoothPlastic
+	body.Color = if isSupreme then Color3.fromRGB(60, 200, 40) else Color3.fromRGB(92, 51, 23)
+	body.Material = if isSupreme then Enum.Material.Neon else Enum.Material.SmoothPlastic
 	body.Anchored = true
 	body.CanCollide = false -- Kollision machen wir selbst (räumliche Abfrage)
 	body.Parent = model
@@ -45,13 +63,13 @@ local function buildTruck(): Model
 	local cab = Instance.new("Part")
 	cab.Name = "Cab"
 	cab.Size = Vector3.new(6, 6, 8)
-	cab.Color = Color3.fromRGB(200, 30, 30)
+	cab.Color = if isSupreme then Color3.fromRGB(20, 80, 20) else Color3.fromRGB(200, 30, 30)
 	cab.Material = Enum.Material.SmoothPlastic
 	cab.Anchored = true
 	cab.CanCollide = false
 	cab.Parent = model
 
-	-- "SCHOKO EXPRESS"-Schriftzug auf beiden Seiten
+	-- Schriftzug auf beiden Seiten
 	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
 		local gui = Instance.new("SurfaceGui")
 		gui.Face = face
@@ -59,12 +77,18 @@ local function buildTruck(): Model
 		local label = Instance.new("TextLabel")
 		label.Size = UDim2.fromScale(1, 1)
 		label.BackgroundTransparency = 1
-		label.Text = "🍫 SCHOKO EXPRESS 🍫"
+		label.Text = if isSupreme then "☢️ MUTANTEN EXPRESS ☢️" else "🍫 SCHOKO EXPRESS 🍫"
 		label.TextScaled = true
 		label.Font = Enum.Font.FredokaOne
-		label.TextColor3 = Color3.fromRGB(255, 215, 0)
+		label.TextColor3 = if isSupreme then Color3.fromRGB(180, 255, 80) else Color3.fromRGB(255, 215, 0)
 		label.Parent = gui
 		gui.Parent = body
+	end
+
+	if isSupreme then
+		local sparkles = Instance.new("Sparkles")
+		sparkles.SparkleColor = Color3.fromRGB(110, 255, 40)
+		sparkles.Parent = body
 	end
 
 	-- Hup-Sound (SoundId in Studio eintragen – es gibt keinen Built-in-Huper)
@@ -79,10 +103,11 @@ local function buildTruck(): Model
 end
 
 -- Eine komplette Truck-Fahrt. dir = 1 (von links) oder -1 (von rechts). Blockiert bis fertig.
-local function runTruck(dir: number)
+-- isSupreme: Mutanten-Express – droppt ca. Config.SupremeSnackCount Supreme-Snacks statt normaler.
+local function runTruck(dir: number, isSupreme: boolean?)
 	local startX = -dir * ROAD_END
 
-	local truck = buildTruck()
+	local truck = buildTruck(isSupreme)
 	local body = truck.PrimaryPart :: BasePart
 	local cab = truck:FindFirstChild("Cab") :: BasePart
 
@@ -129,6 +154,14 @@ local function runTruck(dir: number)
 		end
 	end
 
+	-- Supreme-Trucks droppen nur wenige, dafür fette Snacks:
+	-- Intervall so strecken, dass über die Drop-Zone ~SupremeSnackCount Stück fallen
+	local dropInterval = Config.TruckDropInterval
+	if isSupreme then
+		local zoneTime = (2 * Config.TruckDropZone) / Config.TruckSpeed
+		dropInterval = zoneTime / (Config.SupremeSnackCount + 0.5)
+	end
+
 	local dropTimer = 0
 	local finished = false
 	local connection: RBXScriptConnection
@@ -141,7 +174,7 @@ local function runTruck(dir: number)
 
 		-- Snacks hinter dem Truck rausfallen lassen
 		dropTimer += dt
-		if dropTimer >= Config.TruckDropInterval and math.abs(newX) < Config.TruckDropZone then
+		if dropTimer >= dropInterval and math.abs(newX) < Config.TruckDropZone then
 			dropTimer = 0
 			local dropPos = Vector3.new(newX - dir * 14, 6, 0)
 			-- Snacks seitlich von der Straße wegschleudern (in die Plaza)
@@ -150,7 +183,11 @@ local function runTruck(dir: number)
 				math.random(25, 45),
 				math.random(20, 40) * (math.random() > 0.5 and 1 or -1)
 			)
-			SnackService.SpawnRandom(dropPos, sideVel)
+			if isSupreme then
+				SnackService.SpawnSnack(SnackTypes.RollSupreme(), dropPos, sideVel)
+			else
+				SnackService.SpawnRandom(dropPos, sideVel)
+			end
 		end
 
 		-- Ende der Straße erreicht -> Truck weg
@@ -167,20 +204,43 @@ local function runTruck(dir: number)
 	end
 end
 
+-- Debug-Hook: Mutanten-Express SOFORT losschicken (fürs Test-Menü).
+-- Läuft unabhängig von der normalen Event-Schleife, Countdown bleibt unberührt.
+function TruckService.DebugSupremeNow()
+	task.spawn(function()
+		announceRemote:FireAllClients("☢️☢️ DER MUTANTEN-EXPRESS!! MUTIERTE SNACKS!!! ☢️☢️", "Supreme")
+		runTruck(math.random() > 0.5 and 1 or -1, true)
+	end)
+end
+
+-- Debug-Hook: normalen Truck sofort losschicken (fürs Test-Menü)
+function TruckService.DebugTruckNow()
+	task.spawn(function()
+		announceRemote:FireAllClients("🚚💨 DER SCHOKO-TRUCK IST DA! SNACKS!!!", "Legendary")
+		runTruck(math.random() > 0.5 and 1 or -1)
+	end)
+end
+
 function TruckService.Init(services)
 	SnackService = services.SnackService
 	Ragdoll = services.Ragdoll
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent
 
+	rollSupremeCountdown()
+
 	task.spawn(function()
 		task.wait(Config.TruckFirstSpawnDelay)
 		local dirFlip = false
 		while true do
 			truckCounter += 1
-			local isRushHour = truckCounter % Config.RushHourEvery == 0
+			-- Countdown abgelaufen? Dann kommt statt des normalen Trucks der Mutanten-Express!
+			local isSupreme = supremeLeft <= 0
+			local isRushHour = not isSupreme and truckCounter % Config.RushHourEvery == 0
 
-			if isRushHour then
+			if isSupreme then
+				announceRemote:FireAllClients("☢️ ACHTUNG!! DER MUTANTEN-EXPRESS NÄHERT SICH... ☢️", "Supreme")
+			elseif isRushHour then
 				announceRemote:FireAllClients("🚨 RUSH HOUR!! GLEICH KOMMEN ZWEI TRUCKS!!", "Mythic")
 			else
 				announceRemote:FireAllClients(
@@ -192,7 +252,11 @@ function TruckService.Init(services)
 
 			dirFlip = not dirFlip
 			local dir = dirFlip and 1 or -1
-			if isRushHour then
+			if isSupreme then
+				announceRemote:FireAllClients("☢️☢️ MUTIERTE SNACKS AUF DER STRASSE!!! ☢️☢️", "Supreme")
+				runTruck(dir, true)
+				rollSupremeCountdown() -- neuen Countdown würfeln
+			elseif isRushHour then
 				announceRemote:FireAllClients("🚚🚚 DOPPELTES SNACK-CHAOS!!!", "Legendary")
 				task.spawn(runTruck, -dir) -- zweiter Truck aus der Gegenrichtung
 				task.wait(1.5)
@@ -200,6 +264,11 @@ function TruckService.Init(services)
 			else
 				announceRemote:FireAllClients("🚚💨 DER SCHOKO-TRUCK IST DA! SNACKS!!!", "Legendary")
 				runTruck(dir)
+			end
+
+			if not isSupreme then
+				supremeLeft -= 1
+				workspace:SetAttribute("SupremeTrucksLeft", supremeLeft)
 			end
 
 			task.wait(Config.TruckInterval)
