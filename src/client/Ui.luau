@@ -514,7 +514,8 @@ end
 
 local function rarityHex(rarity: string): string
 	local c = SnackTypes.RarityColors[rarity] or Color3.new(1, 1, 1)
-	return string.format("#%02X%02X%02X", c.R * 255, c.G * 255, c.B * 255)
+	-- %X verlangt Integer, Color3-Kanäle sind Floats -> runden!
+	return string.format("#%02X%02X%02X", math.round(c.R * 255), math.round(c.G * 255), math.round(c.B * 255))
 end
 
 -- Drop-Chancen eines Eis als bunte RichText-Zeile (gleiche Formel wie der Server!)
