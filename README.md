@@ -50,7 +50,31 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
    Yeets, Merges, Eier & Rebirths. 35 Stufen, Free-Spur für alle + Premium-Spur
    per Robux-Gamepass (bessere Belohnungen, exklusiver Zucker-Phönix auf 35).
    Season-exklusive Trails sind nicht kaufbar, nur erspielbar.
-15. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
+15. 🌟 **Goldener Snack** (`Config.GoldenSnack`): spawnt alle 2–4 Minuten an
+   einer zufälligen Stelle (Lichtsäule + Ankündigung mit Himmelsrichtung).
+   Wer ihn ZUERST berührt, kassiert Cash × Rebirth-Multiplikator + Season-XP –
+   server-autoritativ, keine Doppel-Vergabe.
+16. 🏆 **Achievements** (`Config.Achievements`): 14 Meilensteine (Yeets,
+   Einlagerungen, Rebirths, Tresor-Knacks, Legendary-Pet, Goldene Snacks,
+   Imperium). Serverseitig im Profil getrackt, Popup + Trophäen-Fenster.
+   BadgeIds sind Platzhalter (0) – echte Badges auf der Creator-Seite anlegen,
+   dann vergibt `BadgeService:AwardBadge` sie automatisch mit.
+17. 🤝 **Freunde-Bonus** (`Config.FriendBonusPercent`): Roblox-Freunde im
+   selben Server = +10 % Tresor-Einkommen für BEIDE (eigener Zahl-Tick im
+   FriendBonusService, UI-Badge zeigt den aktiven Bonus).
+18. 👥 **Referral-System** (`Config.Referral`): Jeder hat einen Code
+   ("YEET-<UserId>", Fenster über den 👥-Button; Einladungs-Links mit
+   LaunchData `ref=<UserId>` funktionieren auch). Löst ein NEUER Spieler ihn
+   ein und schafft Rebirth 1, bekommt der Einladende 5000 💰 + Gold-Ei – auch
+   offline (Pending-DataStore `YeetDenSnackReferrals_v1`).
+19. 🏡 **Basis-Deko** (`Config.Decorations`): 7 Candy-Deko-Objekte (Laterne,
+   Riesen-Lolli, Gummibär, Donut, Schoko-Brunnen, Eisturm, Disco-Bonbon) für
+   6 feste Slots um die Basis. Kauf & Platzierung am pinken Deko-Pad,
+   persistent gespeichert (profile.Housing), Aufbau beim Join automatisch.
+20. ✨ **Grafik-Politur** (AtmosphereService): ShadowMap-Lighting, Atmosphere,
+   Bloom, SunRays, ColorCorrection, Wolken + Candy-Straßenlaternen,
+   Riesen-Zuckerstangen, Plaza-Neonrahmen und Willkommens-Bogen am Spawn.
+21. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
    Spiel-Besitzer (bzw. Gruppen-Rang ≥254) + UserIds aus `Config.DebugUserIds`.
 
 ## Entwicklung
@@ -91,6 +115,14 @@ src/server/   → ServerScriptService.Server
                            Gamepass-Check (MarketplaceService)
   Services/StyleService    Trails + Ganzkörper-Skins (kosmetisch, inkl. Season-Trails)
   Services/MergeService    Merge-Maschine (2+ gleiche Snacks -> Chance auf seltener)
+  Services/AchievementService  Meilensteine + Badge-Grundgerüst; wrappt
+                           BaseService.AddToVault/TryCrack von außen (Zähler)
+  Services/GoldenSnackService  Goldener-Snack-Minievent (First-Touch-Claim)
+  Services/FriendBonusService  Freunde-Erkennung (GetFriendsAsync) + Bonus-Tick
+  Services/ReferralService Einladungs-Codes, Meilenstein-Wache,
+                           Pending-DataStore für Offline-Gutschriften
+  Services/HousingService  Basis-Deko: Kauf/Slots/Persistenz + Deko-Pad
+  Services/AtmosphereService  Grafik-Politur (Lighting-Effects + Map-Deko)
   Services/DebugService    Admin-/Test-Menü (Studio, Spiel-Besitzer, Whitelist)
 
 src/client/   → StarterPlayerScripts
@@ -119,3 +151,6 @@ src/client/   → StarterPlayerScripts
 6. **Premium-Pass-Gamepass** im Creator Dashboard anlegen und die Id in
    `Config.SeasonPass.GamepassId` eintragen (solange 0: Kauf-Button zeigt
    nur einen Hinweis-Toast).
+7. **Badges anlegen**: Auf create.roblox.com für die 14 Achievements Badges
+   erstellen und die Ids in `Config.Achievements[n].BadgeId` eintragen
+   (solange 0: nur In-Game-Popup, kein echtes Badge).

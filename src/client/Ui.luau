@@ -2115,7 +2115,7 @@ local function buildHelp()
 	panel.Name = "HelpPanel"
 	panel.AnchorPoint = Vector2.new(0.5, 0.5)
 	panel.Position = UDim2.fromScale(0.5, 0.5)
-	panel.Size = UDim2.fromOffset(440, 330)
+	panel.Size = UDim2.fromOffset(460, 490)
 	panel.BackgroundColor3 = Color3.fromRGB(30, 35, 50)
 	panel.Visible = false
 	roundify(panel, 16)
@@ -2145,6 +2145,11 @@ local function buildHelp()
 		"😈 Fremde Tresore kann man KNACKEN [E halten]",
 		"🔥 Schnell nacheinander einlagern = COMBO-Bonus",
 		"🌟 SUGAR RUSH: Tresor springt AUF (Snacks für alle!), dafür +50% Einkommen & mehr Plätze!",
+		"🌟 GOLDENER SNACK: taucht zufällig auf – wer ZUERST hinrennt, kassiert!",
+		"🏆 ACHIEVEMENTS (Pokal-Button): Meilensteine sammeln!",
+		"🤝 Mit Roblox-FREUNDEN im Server spielen = +10% Einkommen!",
+		"👥 FREUNDE EINLADEN (Button rechts): Code teilen = fette Belohnung!",
+		"🏡 PINKES PAD an deiner Basis = Deko kaufen & aufstellen!",
 	}, "\n")
 
 	local body = Instance.new("TextLabel")
@@ -2154,7 +2159,7 @@ local function buildHelp()
 	body.Font = FONT
 	body.Text = helpText
 	body.TextColor3 = Color3.new(1, 1, 1)
-	body.TextSize = 19
+	body.TextSize = 16
 	body.TextWrapped = true
 	body.TextXAlignment = Enum.TextXAlignment.Left
 	body.TextYAlignment = Enum.TextYAlignment.Top

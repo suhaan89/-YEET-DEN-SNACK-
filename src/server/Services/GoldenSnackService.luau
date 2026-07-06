@@ -45,7 +45,7 @@ local function directionHint(position: Vector3): string
 	if #hints == 0 then
 		return "bei der PLAZA"
 	end
-	return table.concat(hints, " ")
+	return table.concat(hints, " und ")
 end
 
 -- Zufällige Boden-Position im Spawn-Bereich (Raycast von oben, damit der

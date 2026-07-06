@@ -277,7 +277,8 @@ local function buildPad(player: Player, base): Part
 	pad.Anchored = true
 	pad.Shape = Enum.PartType.Cylinder
 	pad.Size = Vector3.new(0.5, 7, 7)
-	pad.CFrame = base.Slot * CFrame.new(-11, 1.25, 14) * CFrame.Angles(0, 0, math.rad(90))
+	-- Hinter dem Tresor, zwischen den Zaunpfosten (links wäre das Hort-Grid im Weg)
+	pad.CFrame = base.Slot * CFrame.new(5, 1.25, 20) * CFrame.Angles(0, 0, math.rad(90))
 	pad.Color = Color3.fromRGB(255, 130, 200)
 	pad.Material = Enum.Material.Neon
 
