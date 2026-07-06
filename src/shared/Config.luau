@@ -134,6 +134,19 @@ local Config = {
 	-- Zahl-Tick im FriendBonusService, unabhängig vom BaseService).
 	FriendBonusPercent = 0.1, -- +10% Tresor-Einkommen, solange mind. 1 Freund online ist
 
+	-- ══ Referral-/Einladungssystem ══
+	-- Jeder Spieler hat einen Code ("YEET-<UserId>"). Löst ein NEUER Spieler
+	-- ihn ein, wird er dauerhaft mit dem Einladenden verknüpft. Erreicht der
+	-- Eingeladene den Meilenstein (Rebirth 1), kassiert der EINLADENDE –
+	-- auch wenn er gerade offline ist (Pending-DataStore).
+	Referral = {
+		RewardCash = 5000, -- Cash für den Einladenden pro erfolgreichem Freund
+		RewardEgg = "Golden", -- ... plus ein Gratis-Ei dieses Typs
+		MilestoneRebirths = 1, -- Meilenstein: der Eingeladene schafft so viele Rebirths
+		CheckInterval = 30, -- Sekunden zwischen zwei Meilenstein-Checks
+		DataStoreName = "YeetDenSnackReferrals_v1", -- Pending-Gutschriften für Offline-Einlader
+	},
+
 	-- ══ Daten ══
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",

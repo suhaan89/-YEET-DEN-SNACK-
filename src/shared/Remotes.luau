@@ -33,6 +33,8 @@ local FUNCTIONS = {
 	"DoMerge", -- Client -> Server: Merge versuchen (snackName, count), gibt {ok, success?, msg} zurück
 	"DebugCommand", -- Client -> Server: Debug-Menü ("list" oder Command-Id) – nur Whitelist/Studio!
 	"GetAchievements", -- Client -> Server: eigene freigeschaltete Achievement-Ids abfragen
+	"GetReferralInfo", -- Client -> Server: eigener Referral-Code + Einladungs-Statistik
+	"RedeemReferral", -- Client -> Server: fremden Referral-Code einlösen, gibt {ok, msg} zurück
 }
 
 local Remotes = {}

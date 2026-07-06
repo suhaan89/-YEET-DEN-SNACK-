@@ -31,6 +31,7 @@ services.MergeService = require(servicesFolder.MergeService)
 services.AchievementService = require(servicesFolder.AchievementService)
 services.GoldenSnackService = require(servicesFolder.GoldenSnackService)
 services.FriendBonusService = require(servicesFolder.FriendBonusService)
+services.ReferralService = require(servicesFolder.ReferralService)
 services.DebugService = require(servicesFolder.DebugService)
 
 -- Reihenfolge ist wichtig: Daten -> Spieler -> Map -> Gameplay
@@ -50,6 +51,7 @@ services.MergeService.Init(services)
 services.AchievementService.Init(services) -- wrappt BaseService-Aufrufe, daher nach BaseService
 services.GoldenSnackService.Init(services)
 services.FriendBonusService.Init(services)
+services.ReferralService.Init(services) -- nach PetService (zahlt Eier als Belohnung aus)
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
 
 print("🍫 [YEET DEN SNACK] Server bereit – der Truck kommt gleich!")
