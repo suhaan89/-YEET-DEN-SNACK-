@@ -35,6 +35,9 @@ local FUNCTIONS = {
 	"GetAchievements", -- Client -> Server: eigene freigeschaltete Achievement-Ids abfragen
 	"GetReferralInfo", -- Client -> Server: eigener Referral-Code + Einladungs-Statistik
 	"RedeemReferral", -- Client -> Server: fremden Referral-Code einlösen, gibt {ok, msg} zurück
+	"GetHousing", -- Client -> Server: eigene Deko-Sammlung + belegte Slots abfragen
+	"BuyDeco", -- Client -> Server: Deko-Objekt kaufen (decoId), gibt {ok, msg} zurück
+	"PlaceDeco", -- Client -> Server: Deko in Slot setzen (slotIndex, decoId oder ""), gibt {ok, msg} zurück
 }
 
 local Remotes = {}

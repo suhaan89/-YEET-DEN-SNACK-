@@ -32,6 +32,7 @@ services.AchievementService = require(servicesFolder.AchievementService)
 services.GoldenSnackService = require(servicesFolder.GoldenSnackService)
 services.FriendBonusService = require(servicesFolder.FriendBonusService)
 services.ReferralService = require(servicesFolder.ReferralService)
+services.HousingService = require(servicesFolder.HousingService)
 services.DebugService = require(servicesFolder.DebugService)
 
 -- Reihenfolge ist wichtig: Daten -> Spieler -> Map -> Gameplay
@@ -52,6 +53,7 @@ services.AchievementService.Init(services) -- wrappt BaseService-Aufrufe, daher 
 services.GoldenSnackService.Init(services)
 services.FriendBonusService.Init(services)
 services.ReferralService.Init(services) -- nach PetService (zahlt Eier als Belohnung aus)
+services.HousingService.Init(services)
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
 
 print("🍫 [YEET DEN SNACK] Server bereit – der Truck kommt gleich!")

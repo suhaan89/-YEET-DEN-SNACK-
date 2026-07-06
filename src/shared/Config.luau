@@ -352,6 +352,30 @@ local Config = {
 		{ Id = "Bonbon", Name = "🍬 Bonbon-Blizzard", Color = Color3.fromRGB(120, 220, 255), Rainbow = true, Seasonal = true, Desc = "Season-1-PREMIUM: wirbelnder Bonbon-Sturm!" },
 	},
 
+	-- ══ Basis-Deko (Housing) ══
+	-- Rein kosmetische Deko-Objekte für die eigene Basis: mit Cash kaufen,
+	-- dann in einen der festen Slots setzen (kein freies Bauen). Persistiert
+	-- pro Spieler (profile.Housing) und wird beim Join wieder aufgebaut.
+	Decorations = {
+		{ Id = "Zuckerstange", Name = "🍬 Zuckerstangen-Laterne", Cost = 500, Desc = "Rot-weiß gestreift und leuchtet nachts!" },
+		{ Id = "Lolli", Name = "🍭 Riesen-Lolli", Cost = 1500, Desc = "So groß, dass er als Sonnenschirm durchgeht." },
+		{ Id = "Gummibaer", Name = "🐻 Gummibär-Wächter", Cost = 4000, Desc = "Bewacht deine Basis. Rein dekorativ. Leider." },
+		{ Id = "Donut", Name = "🍩 Mega-Donut", Cost = 8000, Desc = "Mit Streuseln! Anlehnen verboten." },
+		{ Id = "Brunnen", Name = "⛲ Schoko-Brunnen", Cost = 20000, Desc = "Sprudelt echte* Schokolade. (*nicht echt)" },
+		{ Id = "Eisturm", Name = "🍦 Softeis-Turm", Cost = 40000, Desc = "Drei Kugeln Angeberei mit Sahnehaube." },
+		{ Id = "Disco", Name = "🪩 Disco-Bonbon", Cost = 75000, Desc = "Party-Beleuchtung für die reichste Basis der Straße." },
+	},
+	-- Feste Deko-Slots: lokale Offsets relativ zur Basis-Mitte (kollidieren
+	-- nicht mit Zaun/Hort/Tresor/Bau-Pad der Tycoon-Ausbaustufen)
+	DecoSlots = {
+		Vector3.new(-16, 0, -16), -- vorne links
+		Vector3.new(16, 0, -16), -- vorne rechts
+		Vector3.new(-16, 0, 4), -- mitte links
+		Vector3.new(16, 0, 4), -- mitte rechts
+		Vector3.new(-8, 0, -18), -- Eingang links
+		Vector3.new(8, 0, -18), -- Eingang rechts
+	},
+
 	-- ══ Debug/Test-Menü ══
 	-- Im Studio ist das Menü IMMER sichtbar. Für Team Test/Live-Server hier UserIds eintragen:
 	DebugUserIds = {
@@ -426,6 +450,11 @@ end
 Config.EggPetsById = {} :: { [string]: any }
 for _, def in Config.EggPets do
 	Config.EggPetsById[def.Id] = def
+end
+
+Config.DecorationsById = {} :: { [string]: any }
+for _, def in Config.Decorations do
+	Config.DecorationsById[def.Id] = def
 end
 
 -- Chancen eines Eis als normalisierte Prozente (fürs UI, immer synchron zum Server-Wurf)

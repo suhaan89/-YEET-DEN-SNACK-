@@ -967,6 +967,208 @@ local function buildMergeUi()
 	layout.Parent = mergeList
 end
 
+-- ══════════ Basis-Deko (Housing) ══════════
+-- Wird über das pinke Deko-Pad an der eigenen Basis geöffnet (OpenShop
+-- "Housing"). Oben die 6 Slots mit Blätter-Buttons, darunter der Deko-Shop.
+
+local housingCache: any = { Owned = {}, Slots = {} }
+local refreshHousing: () -> () = function() end
+
+local function buildHousing()
+	local frame = makeWindow("🏡 BASIS-DEKO", Vector2.new(470, 540), Color3.fromRGB(255, 150, 210))
+	shopWindows.Housing = frame
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 48)
+	list.Size = UDim2.new(1, -24, 1, -60)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- ── Sektion 1: Slots mit Blätter-Buttons ──
+	local slotHeader = makeLabel(list, {
+		Size = UDim2.new(1, -8, 0, 26),
+		Text = "📍 DEINE DEKO-SLOTS",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 180, 225),
+	})
+	slotHeader.LayoutOrder = 1
+
+	-- Blätter-Optionen: "leer" + alle Decos, die man besitzt (Config-Reihenfolge)
+	local function ownedOptions(): { string }
+		local options = { "" }
+		for _, def in Config.Decorations do
+			if housingCache.Owned and housingCache.Owned[def.Id] then
+				table.insert(options, def.Id)
+			end
+		end
+		return options
+	end
+
+	local slotLabels: { TextLabel } = {}
+	for slotIndex = 1, #Config.DecoSlots do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 46)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = 1 + slotIndex
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 2),
+			Size = UDim2.fromOffset(64, 42),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = ("Slot %d"):format(slotIndex),
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+		})
+		local currentLabel = makeLabel(row, {
+			Position = UDim2.fromOffset(80, 2),
+			Size = UDim2.new(1, -190, 1, -4),
+			Text = "– leer –",
+			TextColor3 = Color3.new(1, 1, 1),
+		})
+		slotLabels[slotIndex] = currentLabel
+
+		-- Server-Aufruf: nächste/vorherige Option in diesen Slot setzen
+		local function cycle(direction: number)
+			local options = ownedOptions()
+			if #options <= 1 then
+				Ui.Toast("❌ Erst unten Deko kaufen!")
+				return
+			end
+			local current = housingCache.Slots and housingCache.Slots[tostring(slotIndex)] or ""
+			local index = table.find(options, current) or 1
+			index = (index - 1 + direction) % #options + 1
+			task.spawn(function()
+				local ok, result = pcall(function()
+					return (Remotes.Get("PlaceDeco") :: RemoteFunction):InvokeServer(slotIndex, options[index])
+				end)
+				if ok and result then
+					Ui.Toast((result.ok and "🏡 " or "❌ ") .. result.msg)
+				end
+				refreshHousing()
+			end)
+		end
+
+		for _, dir in { { Text = "◀", X = -54, Dir = -1 }, { Text = "▶", X = -8, Dir = 1 } } do
+			local button = Instance.new("TextButton")
+			button.AnchorPoint = Vector2.new(1, 0.5)
+			button.Position = UDim2.new(1, dir.X, 0.5, 0)
+			button.Size = UDim2.fromOffset(40, 34)
+			button.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
+			button.Font = FONT
+			button.TextScaled = true
+			button.Text = dir.Text
+			button.TextColor3 = Color3.new(1, 1, 1)
+			roundify(button, 8)
+			button.Parent = row
+			button.Activated:Connect(function()
+				cycle(dir.Dir)
+			end)
+		end
+	end
+
+	-- ── Sektion 2: Deko-Shop ──
+	local shopHeader = makeLabel(list, {
+		Size = UDim2.new(1, -8, 0, 26),
+		Text = "🛒 DEKO KAUFEN",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 220, 120),
+	})
+	shopHeader.LayoutOrder = 50
+
+	local buyButtons: { [string]: TextButton } = {}
+	for i, def in Config.Decorations do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 54)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = 50 + i
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Name,
+			TextColor3 = Color3.fromRGB(255, 190, 230),
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -140, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Desc,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+		})
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 38)
+		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = formatNumber(def.Cost) .. "💰"
+		roundify(button, 10)
+		button.Parent = row
+		buyButtons[def.Id] = button
+
+		button.Activated:Connect(function()
+			if housingCache.Owned and housingCache.Owned[def.Id] then
+				Ui.Toast("✅ Hast du schon – oben in einen Slot blättern!")
+				return
+			end
+			task.spawn(function()
+				local ok, result = pcall(function()
+					return (Remotes.Get("BuyDeco") :: RemoteFunction):InvokeServer(def.Id)
+				end)
+				if ok and result then
+					Ui.Toast((result.ok and "🏡 " or "❌ ") .. result.msg)
+				end
+				refreshHousing()
+			end)
+		end)
+	end
+
+	refreshHousing = function()
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return (Remotes.Get("GetHousing") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(data) ~= "table" then
+				return
+			end
+			housingCache = data
+			for slotIndex, label in slotLabels do
+				local decoId = data.Slots and data.Slots[tostring(slotIndex)]
+				local def = decoId and Config.DecorationsById[decoId]
+				label.Text = def and def.Name or "– leer –"
+				label.TextColor3 = def and Color3.fromRGB(255, 220, 120) or Color3.fromRGB(150, 145, 165)
+			end
+			for decoId, button in buyButtons do
+				if data.Owned and data.Owned[decoId] then
+					button.Text = "✓ GEKAUFT"
+					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+				else
+					local def = Config.DecorationsById[decoId]
+					button.Text = formatNumber(def.Cost) .. "💰"
+					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+				end
+			end
+		end)
+	end
+end
+
 -- ══════════ Fenster öffnen (vom OpenShop-Remote getriggert) ══════════
 
 function Ui.OpenShop(shopId: string)
@@ -984,6 +1186,8 @@ function Ui.OpenShop(shopId: string)
 		refreshCollectionShops()
 	elseif shopId == "Merge" then
 		refreshMerge()
+	elseif shopId == "Housing" then
+		refreshHousing()
 	end
 end
 
@@ -2025,6 +2229,7 @@ function Ui.Build()
 		},
 	})
 	buildMergeUi()
+	buildHousing()
 	buildSupremeBar()
 	buildFriendBonus()
 	buildChargeBar()
