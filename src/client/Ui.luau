@@ -1794,6 +1794,163 @@ local function buildReferral()
 	end)
 end
 
+-- ══════════ Basis-Deko (Housing) ══════════
+-- Kaufen + Aufstellen/Entfernen von Deko-Objekten für die eigene Basis.
+-- Besitz/Slots kommen per GetHousing vom Server; validiert wird dort.
+
+local function buildHousing()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "HousingToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 220) -- unter Hilfe/Pass/Achievements/Referral
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(120, 200, 120)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🏡"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🏡 BASIS-DEKO", Vector2.new(460, 520), Color3.fromRGB(150, 230, 150))
+
+	local slotLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 22),
+		Text = "",
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 15,
+	})
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 70)
+	list.Size = UDim2.new(1, -24, 1, -82)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	local housingCache: any = { Owned = {}, Slots = {}, HasBase = false, SlotCount = #Config.HousingSlotOffsets }
+	local decorRows: { [string]: TextButton } = {}
+	local refresh: () -> ()
+
+	for i, def in Config.HousingDecor do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 54)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = i
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Name,
+			TextColor3 = def.Color or Color3.new(1, 1, 1),
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -140, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Desc or "",
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+		})
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 38)
+		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = formatNumber(def.Cost) .. "💰"
+		roundify(button, 10)
+		button.Parent = row
+		decorRows[def.Id] = button
+
+		button.Activated:Connect(function()
+			task.spawn(function()
+				-- Aktion aus dem Cache ableiten: kaufen -> aufstellen -> entfernen
+				local owned = housingCache.Owned and housingCache.Owned[def.Id] == true
+				local placed = housingCache.Slots and table.find(housingCache.Slots, def.Id) ~= nil
+				local ok, result
+				if not owned then
+					ok, result = pcall(function()
+						return (Remotes.Get("BuyDecor") :: RemoteFunction):InvokeServer(def.Id)
+					end)
+				else
+					ok, result = pcall(function()
+						return (Remotes.Get("PlaceDecor") :: RemoteFunction):InvokeServer(def.Id, not placed)
+					end)
+				end
+				if ok and typeof(result) == "table" then
+					Ui.Toast((result.ok and "🏡 " or "❌ ") .. result.msg)
+				end
+				refresh()
+			end)
+		end)
+	end
+
+	refresh = function()
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return (Remotes.Get("GetHousing") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(data) ~= "table" then
+				return
+			end
+			housingCache = data
+
+			local placedCount = 0
+			for _, decorId in data.Slots or {} do
+				if decorId ~= "" then
+					placedCount += 1
+				end
+			end
+			slotLabel.Text = if data.HasBase
+				then ("Deko-Plätze an deiner Basis: %d/%d belegt"):format(placedCount, data.SlotCount or 0)
+				else "⚠️ Erst eine Basis beanspruchen – dann wird hier dekoriert!"
+
+			for _, def in Config.HousingDecor do
+				local button = decorRows[def.Id]
+				if not button then
+					continue
+				end
+				local owned = data.Owned and data.Owned[def.Id] == true
+				local placed = data.Slots and table.find(data.Slots, def.Id) ~= nil
+				if placed then
+					button.Text = "ENTFERNEN"
+					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+				elseif owned then
+					button.Text = "AUFSTELLEN"
+					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				else
+					button.Text = formatNumber(def.Cost) .. "💰"
+					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+				end
+			end
+		end)
+	end
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -1934,6 +2091,7 @@ function Ui.Build()
 	buildSeasonPass()
 	buildAchievements()
 	buildReferral()
+	buildHousing()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

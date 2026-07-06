@@ -33,6 +33,9 @@ local FUNCTIONS = {
 	"GetAchievements", -- Client -> Server: eigene Achievement-Stats + Freischaltungen abfragen
 	"GetReferralInfo", -- Client -> Server: eigenen Referral-Code + Einladungs-Statistik abfragen
 	"RedeemReferral", -- Client -> Server: Referral-Code einlösen (code), gibt {ok, msg} zurück
+	"GetHousing", -- Client -> Server: eigene Deko (gekauft + platziert) abfragen
+	"BuyDecor", -- Client -> Server: Deko-Objekt kaufen (decorId), gibt {ok, msg} zurück
+	"PlaceDecor", -- Client -> Server: Deko aufstellen/entfernen (decorId, place), gibt {ok, msg} zurück
 	"DebugCommand", -- Client -> Server: Debug-Menü ("list" oder Command-Id) – nur Whitelist/Studio!
 }
 

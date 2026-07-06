@@ -108,6 +108,33 @@ local Config = {
 	FriendBonusPercent = 0.1, -- +10% solange mindestens ein Freund online ist
 	FriendRecheckInterval = 60, -- Sekunden: fehlgeschlagene Freundes-Checks erneut versuchen
 
+	-- ══ Basis-Deko (Housing) ══
+	-- Rein kosmetische Deko-Objekte für die eigene Basis: kaufen (Cash),
+	-- in feste Slots stellen, wird pro Spieler persistent gespeichert und
+	-- beim nächsten Join automatisch wieder aufgebaut (HousingService).
+	HousingDataStore = "YeetDenSnack_Housing_v1",
+	-- Feste Deko-Slots als LOKALE Offsets relativ zum Basis-Slot
+	-- (44x44-Platte; -Z = vorne Richtung Straße; Tresor/Bau-Pad/Hort hinten
+	-- bei z>=10 werden ausgespart). Kein freies Bauen – nur diese Plätze.
+	HousingSlotOffsets = {
+		Vector3.new(-16, 0, -16), -- vorne links
+		Vector3.new(16, 0, -16), -- vorne rechts
+		Vector3.new(-16, 0, 2), -- Mitte links
+		Vector3.new(16, 0, 2), -- Mitte rechts
+		Vector3.new(0, 0, -19), -- Eingang (vorne Mitte)
+		Vector3.new(7, 0, 19), -- hinten neben dem Tresor
+	},
+	HousingDecor = {
+		{ Id = "Zuckerstange", Name = "🍬 Zuckerstange", Cost = 300, Color = Color3.fromRGB(255, 70, 70), Desc = "Rot-weiß gestreifter Klassiker." },
+		{ Id = "Fahne", Name = "🚩 Snack-Fahne", Cost = 600, Color = Color3.fromRGB(255, 150, 200), Desc = "Zeig allen, wessen Basis das ist!" },
+		{ Id = "Lolli", Name = "🍭 Riesen-Lolli", Cost = 1200, Color = Color3.fromRGB(255, 90, 220), Desc = "So groß, dass er als Baum durchgeht." },
+		{ Id = "Lampe", Name = "🏮 Zuckerwatte-Lampe", Cost = 2000, Color = Color3.fromRGB(255, 170, 220), Desc = "Flauschig-rosa Licht für laue Yeet-Nächte." },
+		{ Id = "Gummibaer", Name = "🐻 Gummibär-Statue", Cost = 4000, Color = Color3.fromRGB(255, 80, 80), Desc = "Ein Denkmal für alle gefallenen Gummibärchen." },
+		{ Id = "Donut", Name = "🍩 Donut-Schild", Cost = 7000, Color = Color3.fromRGB(255, 150, 200), Desc = "Leucht-Donut mit Streuseln. Sehr seriös." },
+		{ Id = "Brunnen", Name = "⛲ Schoko-Brunnen", Cost = 12000, Color = Color3.fromRGB(110, 65, 30), Desc = "Sprudelt echte* Schokolade. (*Platzhalter)" },
+		{ Id = "Disco", Name = "🪩 Disco-Bonbon", Cost = 25000, Color = Color3.fromRGB(180, 120, 255), Desc = "Party-Beleuchtung für Protz-Basen." },
+	},
+
 	-- ══ Referral/Einladungen ══
 	-- Jeder Spieler hat einen festen Code (Prefix + UserId). Löst ein NEUER
 	-- Spieler (vor seinem ersten Rebirth) den Code ein, wird er dauerhaft mit
@@ -417,6 +444,11 @@ end
 Config.EggPetsById = {} :: { [string]: any }
 for _, def in Config.EggPets do
 	Config.EggPetsById[def.Id] = def
+end
+
+Config.HousingDecorById = {} :: { [string]: any }
+for _, def in Config.HousingDecor do
+	Config.HousingDecorById[def.Id] = def
 end
 
 -- Chancen eines Eis als normalisierte Prozente (fürs UI, immer synchron zum Server-Wurf)
