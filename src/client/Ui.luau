@@ -42,11 +42,13 @@ local rebirthButton: TextButton
 local shopWindows: { [string]: Frame } = {}
 
 -- Pet-/Style-Shop: Buttons pro Item + Cache des Server-Stands
-local petRows: { [string]: TextButton } = {}
 local trailRows: { [string]: TextButton } = {}
 local skinRows: { [string]: TextButton } = {}
 local collectionsCache: any =
-	{ Pets = {}, EquippedPet = "", Trails = {}, EquippedTrail = "", Skins = {}, EquippedSkin = "" }
+	{ Pets = {}, EquippedPets = {}, Trails = {}, EquippedTrail = "", Skins = {}, EquippedSkin = "" }
+
+-- Pet-Shop (Eier + Inventar): wird nach jedem GetCollections neu aufgebaut
+local refreshPetInventory: () -> () = function() end
 
 -- Merge-Station
 local mergeList: ScrollingFrame
@@ -383,9 +385,9 @@ local function refreshCollectionShops()
 			return
 		end
 		collectionsCache = data
-		refreshRows(Config.Pets, petRows, data.Pets, data.EquippedPet)
 		refreshRows(Config.Trails, trailRows, data.Trails, data.EquippedTrail)
 		refreshRows(Config.Skins, skinRows, data.Skins, data.EquippedSkin)
+		refreshPetInventory()
 	end)
 end
 
@@ -496,6 +498,324 @@ local function buildCollectionShop(shopId: string, title: string, titleColor: Co
 					refreshCollectionShops()
 				end)
 			end)
+		end
+	end
+end
+
+-- ══════════ Pet-Shop: Eier kaufen + Pet-Inventar ══════════
+-- Kein Direktkauf mehr! Eier öffnen -> Server würfelt -> Reveal-Animation.
+
+local function rarityHex(rarity: string): string
+	local c = SnackTypes.RarityColors[rarity] or Color3.new(1, 1, 1)
+	return string.format("#%02X%02X%02X", c.R * 255, c.G * 255, c.B * 255)
+end
+
+-- Drop-Chancen eines Eis als bunte RichText-Zeile (gleiche Formel wie der Server!)
+local function eggChanceText(eggId: string): string
+	local percents = Config.EggChancePercents(eggId)
+	local parts = {}
+	for _, rarity in Config.PetRarityOrder do
+		local p = percents[rarity]
+		if p and p > 0 then
+			table.insert(parts, ('<font color="%s">%s %s%%</font>'):format(rarityHex(rarity), rarity, string.format("%.4g", p)))
+		end
+	end
+	return table.concat(parts, "  ")
+end
+
+-- Ei-Reveal: Ei wackelt, platzt, Pet poppt in Raritäts-Farbe auf
+local function playEggReveal(result: any)
+	local overlay = Instance.new("TextButton") -- Button = wegklickbar
+	overlay.Name = "EggReveal"
+	overlay.Size = UDim2.fromScale(1, 1)
+	overlay.BackgroundColor3 = Color3.new(0, 0, 0)
+	overlay.BackgroundTransparency = 0.4
+	overlay.Text = ""
+	overlay.AutoButtonColor = false
+	overlay.ZIndex = 20
+	overlay.Parent = gui
+
+	local egg = makeLabel(overlay, {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.45),
+		Size = UDim2.fromOffset(150, 150),
+		Text = "🥚",
+		ZIndex = 21,
+	})
+
+	local dismissed = false
+	overlay.Activated:Connect(function()
+		dismissed = true
+		overlay:Destroy()
+	end)
+
+	task.spawn(function()
+		-- Wackeln (immer hektischer)
+		for i = 1, 7 do
+			if not overlay.Parent then
+				return
+			end
+			local tween = TweenService:Create(
+				egg,
+				TweenInfo.new(0.24 - i * 0.02, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+				{ Rotation = if i % 2 == 0 then 20 else -20 }
+			)
+			tween:Play()
+			tween.Completed:Wait()
+		end
+		if dismissed or not overlay.Parent then
+			return
+		end
+
+		-- PLATZ!
+		egg.Rotation = 0
+		egg.Text = "💥"
+		task.wait(0.18)
+		if dismissed or not overlay.Parent then
+			return
+		end
+		egg.Visible = false
+
+		local pet = result.Pet
+		local color = SnackTypes.RarityColors[pet.Rarity] or Color3.new(1, 1, 1)
+
+		local nameLabel = makeLabel(overlay, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.42),
+			Size = UDim2.fromOffset(10, 10), -- startet winzig, poppt groß
+			Text = pet.Name,
+			TextColor3 = color,
+			ZIndex = 21,
+		})
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = color
+		stroke.Thickness = 2
+		stroke.Transparency = 0.4
+		stroke.Parent = nameLabel
+		TweenService:Create(nameLabel, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Size = UDim2.fromOffset(520, 64),
+		}):Play()
+
+		makeLabel(overlay, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.53),
+			Size = UDim2.fromOffset(420, 30),
+			Text = ("⭐ %s ⭐"):format(pet.Rarity),
+			TextColor3 = color,
+			ZIndex = 21,
+		})
+		makeLabel(overlay, {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.62),
+			Size = UDim2.fromOffset(520, 26),
+			Text = if result.Duplicate
+				then ("😅 Schon im Team! Dafür: +%d💰"):format(result.Refund or 0)
+				else pet.Desc or "",
+			TextColor3 = Color3.fromRGB(230, 230, 240),
+			ZIndex = 21,
+		})
+
+		task.wait(2.6)
+		if overlay.Parent then
+			overlay:Destroy()
+		end
+	end)
+end
+
+local function buildPetShop()
+	local frame = makeWindow("🥚 PET-SHOP", Vector2.new(470, 540), Color3.fromRGB(140, 230, 160))
+	shopWindows.Pets = frame
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 48)
+	list.Size = UDim2.new(1, -24, 1, -60)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- ── Sektion 1: Eier ──
+	local eggHeader = makeLabel(list, {
+		Size = UDim2.new(1, -8, 0, 26),
+		Text = "🥚 EIER ÖFFNEN",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 220, 120),
+	})
+	eggHeader.LayoutOrder = 1
+
+	local buying = false -- Doppelklick-Schutz (Server validiert eh, das hier ist nur UX)
+	for i, eggDef in Config.Eggs do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 66)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = 1 + i
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 24),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = eggDef.Name,
+			TextColor3 = eggDef.Color,
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 28),
+			Size = UDim2.new(1, -140, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = eggDef.Desc,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+		})
+		local chanceLabel = makeLabel(row, {
+			Position = UDim2.fromOffset(10, 46),
+			Size = UDim2.new(1, -140, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = eggChanceText(eggDef.Id),
+			TextScaled = false,
+			TextSize = 13,
+		})
+		chanceLabel.RichText = true
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 44)
+		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = formatNumber(eggDef.Cost) .. "💰"
+		roundify(button, 10)
+		button.Parent = row
+
+		button.Activated:Connect(function()
+			if buying then
+				return
+			end
+			buying = true
+			task.spawn(function()
+				local ok, result = pcall(function()
+					return (Remotes.Get("BuyEgg") :: RemoteFunction):InvokeServer(eggDef.Id)
+				end)
+				buying = false
+				if not ok or typeof(result) ~= "table" then
+					return
+				end
+				if result.ok and result.Pet then
+					playEggReveal(result)
+					Ui.Toast("🥚 " .. result.msg)
+				else
+					Ui.Toast("❌ " .. result.msg)
+				end
+				refreshCollectionShops()
+			end)
+		end)
+	end
+
+	-- ── Sektion 2: Pet-Inventar ──
+	local invHeader = makeLabel(list, {
+		Size = UDim2.new(1, -8, 0, 26),
+		Text = "🎒 DEINE PETS",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(140, 230, 160),
+	})
+	invHeader.LayoutOrder = 100
+
+	local invContainer = Instance.new("Frame")
+	invContainer.Size = UDim2.new(1, -8, 0, 0)
+	invContainer.AutomaticSize = Enum.AutomaticSize.Y
+	invContainer.BackgroundTransparency = 1
+	invContainer.LayoutOrder = 101
+	invContainer.Parent = list
+	local invLayout = Instance.new("UIListLayout")
+	invLayout.Padding = UDim.new(0, 6)
+	invLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	invLayout.Parent = invContainer
+
+	-- Inventar aus dem collectionsCache neu aufbauen (nach jedem GetCollections)
+	refreshPetInventory = function()
+		local equipped: { string } = collectionsCache.EquippedPets or {}
+		invHeader.Text = ("🎒 DEINE PETS (%d/%d ausgerüstet)"):format(#equipped, Config.PetMaxEquipped)
+
+		for _, child in invContainer:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+
+		-- Nach Rarität gruppiert (Config-Reihenfolge ist schon gruppiert)
+		local order = 0
+		for _, def in Config.EggPets do
+			order += 1
+			local owned = collectionsCache.Pets and collectionsCache.Pets[def.Id] == true
+			local isEquipped = table.find(equipped, def.Id) ~= nil
+
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, 0, 0, 54)
+			row.BackgroundColor3 = if owned then Color3.fromRGB(55, 48, 70) else Color3.fromRGB(40, 36, 50)
+			row.LayoutOrder = order
+			roundify(row, 10)
+			row.Parent = invContainer
+
+			makeLabel(row, {
+				Position = UDim2.fromOffset(10, 4),
+				Size = UDim2.new(1, -140, 0, 26),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = if owned then def.Name else "❓ ???",
+				TextColor3 = SnackTypes.RarityColors[def.Rarity] or Color3.new(1, 1, 1),
+				TextTransparency = if owned then 0 else 0.4,
+			})
+			makeLabel(row, {
+				Position = UDim2.fromOffset(10, 32),
+				Size = UDim2.new(1, -140, 0, 16),
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Text = if owned
+					then ("%s · %s"):format(def.Rarity, def.Desc)
+					elseif def.Exclusive then "🎫 Exklusiv aus dem Season-Pass!"
+					else ("%s · Noch nicht aus einem Ei geschlüpft..."):format(def.Rarity),
+				TextColor3 = Color3.fromRGB(190, 190, 200),
+				TextScaled = false,
+				TextSize = 13,
+			})
+
+			if owned then
+				local button = Instance.new("TextButton")
+				button.AnchorPoint = Vector2.new(1, 0.5)
+				button.Position = UDim2.new(1, -8, 0.5, 0)
+				button.Size = UDim2.fromOffset(115, 38)
+				button.Font = FONT
+				button.TextScaled = true
+				button.TextColor3 = Color3.new(1, 1, 1)
+				if isEquipped then
+					button.Text = "✓ AKTIV"
+					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+				else
+					button.Text = "AUSRÜSTEN"
+					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				end
+				roundify(button, 10)
+				button.Parent = row
+
+				button.Activated:Connect(function()
+					task.spawn(function()
+						local ok, result = pcall(function()
+							return (Remotes.Get("EquipPet") :: RemoteFunction):InvokeServer(def.Id)
+						end)
+						if ok and result then
+							Ui.Toast((result.ok and "🐾 " or "❌ ") .. result.msg)
+						end
+						refreshCollectionShops()
+					end)
+				end)
+			end
 		end
 	end
 end
@@ -976,16 +1296,7 @@ function Ui.Build()
 
 	buildCashDisplay()
 	buildShop()
-	buildCollectionShop("Pets", "🐹 PET-SHOP", Color3.fromRGB(140, 230, 160), {
-		{
-			Items = Config.Pets,
-			Rows = petRows,
-			BuyRemote = "BuyPet",
-			EquipRemote = "EquipPet",
-			OwnedKey = "Pets",
-			EquippedKey = "EquippedPet",
-		},
-	})
+	buildPetShop()
 	buildCollectionShop("Style", "✨ STYLE-SHOP", Color3.fromRGB(240, 140, 240), {
 		{
 			Header = "🌀 TRAILS",
