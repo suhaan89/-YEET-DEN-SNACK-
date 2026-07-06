@@ -13,6 +13,7 @@
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
@@ -368,6 +369,10 @@ local function refreshRows(items: { any }, rows: { [string]: TextButton }, owned
 			elseif ownedMap and ownedMap[def.Id] then
 				button.Text = "AUSRÜSTEN"
 				button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+			elseif def.Seasonal then
+				-- Season-Items kann man nicht kaufen – nur über den Pass verdienen
+				button.Text = "🎫 PASS"
+				button.BackgroundColor3 = Color3.fromRGB(90, 90, 110)
 			else
 				button.Text = formatNumber(def.Cost) .. "💰"
 				button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
@@ -386,6 +391,7 @@ local function refreshCollectionShops()
 		end
 		collectionsCache = data
 		refreshRows(Config.Trails, trailRows, data.Trails, data.EquippedTrail)
+		refreshRows(Config.SeasonTrails, trailRows, data.Trails, data.EquippedTrail)
 		refreshRows(Config.Skins, skinRows, data.Skins, data.EquippedSkin)
 		refreshPetInventory()
 	end)
@@ -472,7 +478,8 @@ local function buildCollectionShop(shopId: string, title: string, titleColor: Co
 			button.Font = FONT
 			button.TextScaled = true
 			button.TextColor3 = Color3.new(1, 1, 1)
-			button.Text = formatNumber(def.Cost) .. "💰"
+			-- Season-Items haben keinen Preis (gibt's nur über den Pass)
+			button.Text = if def.Seasonal then "🎫 PASS" else formatNumber(def.Cost) .. "💰"
 			roundify(button, 10)
 			button.Parent = row
 			section.Rows[def.Id] = button
@@ -1195,6 +1202,323 @@ local function buildDebugMenu()
 	end)
 end
 
+-- ══════════ Season-Pass ══════════
+-- Alles rein anzeigend: XP/Stufe/Premium kommen als Player-Attribute vom
+-- Server (SeasonXp/SeasonLevel/SeasonPremium), Belohnungen stehen in Config.
+
+local seasonTrailsById: { [string]: any } = {}
+for _, def in Config.SeasonTrails do
+	seasonTrailsById[def.Id] = def
+end
+
+-- Anzeigetext einer Pass-Belohnung
+local function rewardText(reward: any): string
+	if not reward then
+		return "–"
+	end
+	if reward.Type == "Cash" then
+		return "💰 " .. formatNumber(reward.Amount)
+	elseif reward.Type == "Egg" then
+		local def = Config.EggsById[reward.Egg]
+		return def and def.Name or "🥚 Ei"
+	elseif reward.Type == "Trail" then
+		local def = seasonTrailsById[reward.Trail]
+		return def and def.Name or "🌀 Trail"
+	elseif reward.Type == "Pet" then
+		local def = Config.EggPetsById[reward.Pet]
+		return def and def.Name or "🐾 Pet"
+	end
+	return "???"
+end
+
+-- Kurzes Popup beim Stufenaufstieg
+local function showPassLevelUp(level: number)
+	local rewards = Config.SeasonPass.Rewards[level]
+	local premium = player:GetAttribute("SeasonPremium") == true
+
+	local popup = Instance.new("Frame")
+	popup.AnchorPoint = Vector2.new(0.5, 0)
+	popup.Position = UDim2.new(0.5, 0, 0, -110)
+	popup.Size = UDim2.fromOffset(380, 92)
+	popup.BackgroundColor3 = Color3.fromRGB(60, 40, 90)
+	popup.ZIndex = 15
+	roundify(popup, 14)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(255, 215, 0)
+	stroke.Thickness = 2
+	stroke.Parent = popup
+	popup.Parent = gui
+
+	makeLabel(popup, {
+		Position = UDim2.fromOffset(0, 8),
+		Size = UDim2.new(1, 0, 0, 34),
+		Text = ("🎉 PASS-STUFE %d!"):format(level),
+		TextColor3 = Color3.fromRGB(255, 215, 0),
+		ZIndex = 16,
+	})
+	local lines = {}
+	if rewards and rewards.Free then
+		table.insert(lines, "🎁 " .. rewardText(rewards.Free))
+	end
+	if rewards and rewards.Premium then
+		table.insert(lines, (premium and "👑 " or "🔒 ") .. rewardText(rewards.Premium))
+	end
+	makeLabel(popup, {
+		Position = UDim2.fromOffset(0, 46),
+		Size = UDim2.new(1, 0, 0, 36),
+		Text = table.concat(lines, "   "),
+		TextColor3 = Color3.fromRGB(230, 225, 245),
+		ZIndex = 16,
+	})
+
+	TweenService:Create(popup, TweenInfo.new(0.4, Enum.EasingStyle.Back), {
+		Position = UDim2.new(0.5, 0, 0, 80),
+	}):Play()
+	task.delay(3.2, function()
+		local out = TweenService:Create(popup, TweenInfo.new(0.3), { Position = UDim2.new(0.5, 0, 0, -110) })
+		out:Play()
+		out.Completed:Wait()
+		popup:Destroy()
+	end)
+end
+
+local function buildSeasonPass()
+	-- Button rechts oben, unter dem Hilfe-Knopf
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "PassToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 64)
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🎫"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow(Config.SeasonPass.Name, Vector2.new(540, 560), Color3.fromRGB(255, 200, 80))
+
+	-- Countdown + Stufen-Anzeige
+	local countdownLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 40),
+		Size = UDim2.new(1, -32, 0, 22),
+		Text = "",
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 15,
+	})
+	local levelLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 64),
+		Size = UDim2.new(0.5, -16, 0, 26),
+		Text = "Stufe 0",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 215, 0),
+	})
+	local xpLabel = makeLabel(frame, {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 64),
+		Size = UDim2.new(0.5, -16, 0, 26),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Right,
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+	})
+
+	-- XP-Fortschrittsbalken
+	local barBg = Instance.new("Frame")
+	barBg.Position = UDim2.new(0, 16, 0, 94)
+	barBg.Size = UDim2.new(1, -32, 0, 14)
+	barBg.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+	roundify(barBg, 7)
+	barBg.Parent = frame
+	local barFill = Instance.new("Frame")
+	barFill.Size = UDim2.fromScale(0, 1)
+	barFill.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
+	roundify(barFill, 7)
+	barFill.Parent = barBg
+
+	-- Spalten-Überschriften
+	makeLabel(frame, {
+		Position = UDim2.new(0, 76, 0, 112),
+		Size = UDim2.new(0.5, -84, 0, 20),
+		Text = "🎁 FREE",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(140, 230, 160),
+		TextScaled = false,
+		TextSize = 15,
+	})
+	makeLabel(frame, {
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -16, 0, 112),
+		Size = UDim2.new(0.5, -84, 0, 20),
+		Text = "👑 PREMIUM",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 200, 80),
+		TextScaled = false,
+		TextSize = 15,
+	})
+
+	-- Stufen-Liste
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 134)
+	list.Size = UDim2.new(1, -24, 1, -134 - 64)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- Pro Stufe eine Zeile mit Free-/Premium-Belohnung nebeneinander
+	local rows: { { Row: Frame, Level: TextLabel, Free: TextLabel, Premium: TextLabel } } = {}
+	for level = 1, Config.SeasonPass.LevelCount do
+		local rewards = Config.SeasonPass.Rewards[level]
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 40)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = level
+		roundify(row, 8)
+		row.Parent = list
+
+		local levelText = makeLabel(row, {
+			Position = UDim2.fromOffset(8, 4),
+			Size = UDim2.fromOffset(52, 32),
+			Text = tostring(level),
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+		})
+		local freeText = makeLabel(row, {
+			Position = UDim2.new(0, 64, 0, 4),
+			Size = UDim2.new(0.5, -72, 1, -8),
+			Text = rewardText(rewards and rewards.Free),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextScaled = false,
+			TextSize = 15,
+		})
+		local premiumText = makeLabel(row, {
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -8, 0, 4),
+			Size = UDim2.new(0.5, -72, 1, -8),
+			Text = rewardText(rewards and rewards.Premium),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextScaled = false,
+			TextSize = 15,
+		})
+		rows[level] = { Row = row, Level = levelText, Free = freeText, Premium = premiumText }
+	end
+
+	-- Premium-Kauf-Button
+	local buyButton = Instance.new("TextButton")
+	buyButton.AnchorPoint = Vector2.new(0.5, 1)
+	buyButton.Position = UDim2.new(0.5, 0, 1, -12)
+	buyButton.Size = UDim2.new(1, -24, 0, 44)
+	buyButton.BackgroundColor3 = Color3.fromRGB(200, 140, 40)
+	buyButton.Font = FONT
+	buyButton.TextScaled = true
+	buyButton.TextColor3 = Color3.new(1, 1, 1)
+	buyButton.Text = "👑 PREMIUM-PASS HOLEN (Robux) – bessere Belohnungen auf JEDER Stufe!"
+	roundify(buyButton, 12)
+	buyButton.Parent = frame
+
+	buyButton.Activated:Connect(function()
+		if Config.SeasonPass.GamepassId <= 0 then
+			Ui.Toast("⚠️ Premium-Pass kommt bald! (Gamepass noch nicht eingerichtet)")
+			return
+		end
+		MarketplaceService:PromptGamePassPurchase(player, Config.SeasonPass.GamepassId)
+	end)
+
+	local function refreshPass()
+		local xp = player:GetAttribute("SeasonXp")
+		local level, into, need = Config.SeasonProgress(if typeof(xp) == "number" then xp else 0)
+		local premium = player:GetAttribute("SeasonPremium") == true
+
+		levelLabel.Text = ("🎫 Stufe %d/%d"):format(level, Config.SeasonPass.LevelCount)
+		if need > 0 then
+			xpLabel.Text = ("%d / %d XP"):format(into, need)
+			barFill.Size = UDim2.fromScale(math.clamp(into / need, 0, 1), 1)
+		else
+			xpLabel.Text = "MAX! 👑"
+			barFill.Size = UDim2.fromScale(1, 1)
+		end
+
+		local now = os.time()
+		if now < Config.SeasonPass.StartTime then
+			countdownLabel.Text = "⏳ Die Season hat noch nicht angefangen!"
+		elseif now > Config.SeasonPass.EndTime then
+			countdownLabel.Text = "🏁 Season beendet – danke fürs Mitspielen!"
+		else
+			local left = Config.SeasonPass.EndTime - now
+			countdownLabel.Text = ("⏳ Season endet in %d Tagen, %d Stunden – XP gibt's fürs Einlagern, Yeeten, Mergen & Co."):format(
+				math.floor(left / 86400),
+				math.floor(left % 86400 / 3600)
+			)
+		end
+
+		for lvl, refs in rows do
+			local freeDone = lvl <= level
+			local premiumDone = freeDone and premium
+			refs.Row.BackgroundColor3 = if freeDone then Color3.fromRGB(45, 70, 50) else Color3.fromRGB(55, 48, 70)
+			refs.Level.TextColor3 = if freeDone then Color3.fromRGB(140, 230, 160) else Color3.fromRGB(190, 190, 200)
+			refs.Free.Text = (if freeDone then "✅ " else "") .. rewardText(Config.SeasonPass.Rewards[lvl] and Config.SeasonPass.Rewards[lvl].Free)
+			refs.Free.TextColor3 = if freeDone then Color3.fromRGB(160, 240, 180) else Color3.new(1, 1, 1)
+			refs.Premium.Text = (if premiumDone then "✅ " elseif premium then "" else "🔒 ")
+				.. rewardText(Config.SeasonPass.Rewards[lvl] and Config.SeasonPass.Rewards[lvl].Premium)
+			refs.Premium.TextColor3 = if premiumDone
+				then Color3.fromRGB(255, 220, 120)
+				elseif premium then Color3.new(1, 1, 1)
+				else Color3.fromRGB(150, 145, 165)
+		end
+
+		buyButton.Visible = not premium
+	end
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refreshPass()
+		end
+	end)
+
+	-- Live nachziehen, wenn der Server XP/Stufe/Premium ändert
+	local lastLevel: number? = nil
+	local function onLevelChanged()
+		local level = player:GetAttribute("SeasonLevel")
+		if typeof(level) ~= "number" then
+			return
+		end
+		if lastLevel ~= nil and level > lastLevel then
+			showPassLevelUp(level)
+		end
+		lastLevel = level
+	end
+	player:GetAttributeChangedSignal("SeasonLevel"):Connect(function()
+		onLevelChanged()
+		if frame.Visible then
+			refreshPass()
+		end
+	end)
+	player:GetAttributeChangedSignal("SeasonXp"):Connect(function()
+		if frame.Visible then
+			refreshPass()
+		end
+	end)
+	player:GetAttributeChangedSignal("SeasonPremium"):Connect(function()
+		if frame.Visible then
+			refreshPass()
+		end
+	end)
+	-- Join-Stand übernehmen, OHNE dafür ein Popup zu feuern
+	local joinLevel = player:GetAttribute("SeasonLevel")
+	if typeof(joinLevel) == "number" then
+		lastLevel = joinLevel
+	end
+	refreshPass()
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -1238,6 +1562,8 @@ local function buildHelp()
 		"🗑️ [R] am eigenen Tresor = billigsten Snack rauswerfen",
 		"⬆️ GRÜNES PAD an deiner Basis = Tycoon-AUSBAU (Plätze + Einkommen!)",
 		"🧍 Skins & Trails gibt's im STYLE-SHOP",
+		"🥚 PET-SHOP: Eier öffnen! Bis zu 3 Pets = Boosts (Cash, Yeet, Tempo...)",
+		"🎫 SEASON-PASS (Button rechts): XP durchs Spielen = Belohnungen!",
 		"🏪 Shops & Merge-Maschine sind ORTE am Plaza-Rand!",
 		"🧪 Merge: 2+ gleiche Snacks = Chance auf seltener (RISIKO!)",
 		"😈 Fremde Tresore kann man KNACKEN [E halten]",
@@ -1308,6 +1634,15 @@ function Ui.Build()
 			EquippedKey = "EquippedTrail",
 		},
 		{
+			Header = "🎫 SEASON-TRAILS",
+			Items = Config.SeasonTrails,
+			Rows = trailRows, -- Ids sind eindeutig, gleiche Map wie normale Trails
+			BuyRemote = "BuyTrail", -- Server lehnt Season-Käufe eh ab (Seasonal-Check)
+			EquipRemote = "EquipTrail",
+			OwnedKey = "Trails",
+			EquippedKey = "EquippedTrail",
+		},
+		{
 			Header = "🧍 SKINS",
 			Items = Config.Skins,
 			Rows = skinRows,
@@ -1320,6 +1655,7 @@ function Ui.Build()
 	buildMergeUi()
 	buildSupremeBar()
 	buildChargeBar()
+	buildSeasonPass()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert
