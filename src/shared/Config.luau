@@ -214,6 +214,83 @@ local Config = {
 	SupremeTrucksMax = 120, -- (im Schnitt ~100 Trucks bis zum Event)
 	SupremeSnackCount = 2, -- ca. so viele Supreme-Snacks droppt der Event-Truck
 
+	-- ══ Season-Pass ══
+	-- Zeitlich begrenzter Fortschritt: XP durch normales Spielen, 35 Stufen,
+	-- Free-Spur für alle + Premium-Spur per Robux-Gamepass.
+	-- Neue Season = Id/Zeiten/Rewards hier anpassen (Fortschritt resettet
+	-- automatisch, sobald die gespeicherte Id nicht mehr zur Config passt).
+	SeasonPass = {
+		Id = "S1",
+		Name = "🎪 SEASON 1: ZUCKER-ZIRKUS",
+		StartTime = 1783296000, -- 06.07.2026 00:00 UTC
+		EndTime = 1788220799, -- 31.08.2026 23:59 UTC
+		GamepassId = 0, -- TODO: Gamepass im Creator Dashboard anlegen und Id hier eintragen!
+		LevelCount = 35,
+		XpBase = 60, -- XP für Stufe 1
+		XpFactor = 1.09, -- Bedarf wächst pro Stufe um 9% (Stufe 35 ≈ 1120 XP)
+
+		-- XP pro Aktion (vergeben NUR server-seitig)
+		Xp = {
+			Bank = 10, -- Snack erfolgreich eingelagert
+			BankRareBonus = 30, -- extra, wenn der Snack Announce-würdig war (Legendary+)
+			PerfectYeet = 5, -- im Sweet Spot losgelassen
+			MergeTry = 10, -- Merge-Versuch (auch bei Matsch)
+			MergeSuccess = 30, -- Merge geglückt
+			Rebirth = 400, -- Sugar Rush
+			EggOpen = 15, -- Ei im Pet-Shop geöffnet
+		},
+
+		-- Belohnungen pro Stufe. Typen:
+		--   { Type = "Cash", Amount = n }             direkt aufs Konto
+		--   { Type = "Egg", Egg = "Basic|Golden|Mutant" }  Ei wird sofort geöffnet
+		--   { Type = "Trail", Trail = "<SeasonTrail-Id>" } exklusiver Trail
+		--   { Type = "Pet", Pet = "<EggPet-Id>" }          exklusives Pet
+		Rewards = {
+			{ Free = { Type = "Cash", Amount = 200 }, Premium = { Type = "Egg", Egg = "Golden" } },
+			{ Free = { Type = "Cash", Amount = 300 }, Premium = { Type = "Cash", Amount = 800 } },
+			{ Free = { Type = "Cash", Amount = 450 }, Premium = { Type = "Cash", Amount = 1200 } },
+			{ Free = { Type = "Cash", Amount = 600 }, Premium = { Type = "Cash", Amount = 1600 } },
+			{ Free = { Type = "Egg", Egg = "Basic" }, Premium = { Type = "Egg", Egg = "Golden" } },
+			{ Free = { Type = "Cash", Amount = 900 }, Premium = { Type = "Cash", Amount = 2400 } },
+			{ Free = { Type = "Cash", Amount = 1000 }, Premium = { Type = "Cash", Amount = 2800 } },
+			{ Free = { Type = "Cash", Amount = 1200 }, Premium = { Type = "Cash", Amount = 3200 } },
+			{ Free = { Type = "Cash", Amount = 1400 }, Premium = { Type = "Cash", Amount = 3600 } },
+			{ Free = { Type = "Cash", Amount = 1500 }, Premium = { Type = "Trail", Trail = "Bonbon" } },
+			{ Free = { Type = "Cash", Amount = 1700 }, Premium = { Type = "Cash", Amount = 4400 } },
+			{ Free = { Type = "Cash", Amount = 1800 }, Premium = { Type = "Cash", Amount = 4800 } },
+			{ Free = { Type = "Cash", Amount = 2000 }, Premium = { Type = "Cash", Amount = 5200 } },
+			{ Free = { Type = "Cash", Amount = 2100 }, Premium = { Type = "Cash", Amount = 5600 } },
+			{ Free = { Type = "Egg", Egg = "Basic" }, Premium = { Type = "Egg", Egg = "Golden" } },
+			{ Free = { Type = "Cash", Amount = 2400 }, Premium = { Type = "Cash", Amount = 6400 } },
+			{ Free = { Type = "Cash", Amount = 2600 }, Premium = { Type = "Cash", Amount = 6800 } },
+			{ Free = { Type = "Cash", Amount = 2700 }, Premium = { Type = "Cash", Amount = 7200 } },
+			{ Free = { Type = "Cash", Amount = 2900 }, Premium = { Type = "Cash", Amount = 7600 } },
+			{ Free = { Type = "Trail", Trail = "Zuckerwatte" }, Premium = { Type = "Egg", Egg = "Mutant" } },
+			{ Free = { Type = "Cash", Amount = 3200 }, Premium = { Type = "Cash", Amount = 8400 } },
+			{ Free = { Type = "Cash", Amount = 3300 }, Premium = { Type = "Cash", Amount = 8800 } },
+			{ Free = { Type = "Cash", Amount = 3500 }, Premium = { Type = "Cash", Amount = 9200 } },
+			{ Free = { Type = "Cash", Amount = 3600 }, Premium = { Type = "Cash", Amount = 9600 } },
+			{ Free = { Type = "Egg", Egg = "Golden" }, Premium = { Type = "Egg", Egg = "Mutant" } },
+			{ Free = { Type = "Cash", Amount = 3900 }, Premium = { Type = "Cash", Amount = 10400 } },
+			{ Free = { Type = "Cash", Amount = 4100 }, Premium = { Type = "Cash", Amount = 10800 } },
+			{ Free = { Type = "Cash", Amount = 4200 }, Premium = { Type = "Cash", Amount = 11200 } },
+			{ Free = { Type = "Cash", Amount = 4400 }, Premium = { Type = "Cash", Amount = 11600 } },
+			{ Free = { Type = "Cash", Amount = 4500 }, Premium = { Type = "Egg", Egg = "Mutant" } },
+			{ Free = { Type = "Cash", Amount = 4700 }, Premium = { Type = "Cash", Amount = 12400 } },
+			{ Free = { Type = "Cash", Amount = 4800 }, Premium = { Type = "Cash", Amount = 12800 } },
+			{ Free = { Type = "Cash", Amount = 5000 }, Premium = { Type = "Cash", Amount = 13200 } },
+			{ Free = { Type = "Cash", Amount = 5100 }, Premium = { Type = "Cash", Amount = 13600 } },
+			{ Free = { Type = "Egg", Egg = "Golden" }, Premium = { Type = "Pet", Pet = "Phoenix" } },
+		},
+	},
+
+	-- Season-exklusive Trails: NICHT kaufbar (Seasonal = true), nur als
+	-- Pass-Belohnung. StyleService kennt sie fürs Ausrüsten mit.
+	SeasonTrails = {
+		{ Id = "Zuckerwatte", Name = "🍭 Zuckerwatte-Wolke", Color = Color3.fromRGB(255, 170, 220), Seasonal = true, Desc = "Season-1-Belohnung: flauschig-rosa Spur!" },
+		{ Id = "Bonbon", Name = "🍬 Bonbon-Blizzard", Color = Color3.fromRGB(120, 220, 255), Rainbow = true, Seasonal = true, Desc = "Season-1-PREMIUM: wirbelnder Bonbon-Sturm!" },
+	},
+
 	-- ══ Debug/Test-Menü ══
 	-- Im Studio ist das Menü IMMER sichtbar. Für Team Test/Live-Server hier UserIds eintragen:
 	DebugUserIds = {
@@ -254,6 +331,28 @@ function Config.MergeChance(count: number): number
 		Config.MergeMaxChance,
 		Config.MergeBaseChance + (count - Config.MergeMinCount) * Config.MergeChancePerExtra
 	)
+end
+
+-- XP-Bedarf, um Season-Pass-Stufe `level` abzuschließen
+function Config.SeasonLevelXp(level: number): number
+	return math.floor(Config.SeasonPass.XpBase * Config.SeasonPass.XpFactor ^ (level - 1))
+end
+
+-- Aus Gesamt-XP: (abgeschlossene Stufe, XP in der aktuellen Stufe, Bedarf zur nächsten).
+-- Bedarf = 0 heißt: Maximal-Stufe erreicht. Server-Vergabe und Client-Anzeige
+-- nutzen exakt diese Funktion, damit der Fortschrittsbalken nie lügt.
+function Config.SeasonProgress(xp: number): (number, number, number)
+	local level = 0
+	local remaining = xp
+	while level < Config.SeasonPass.LevelCount do
+		local need = Config.SeasonLevelXp(level + 1)
+		if remaining < need then
+			return level, remaining, need
+		end
+		remaining -= need
+		level += 1
+	end
+	return level, 0, 0
 end
 
 -- ══ Abgeleitete Lookups (Server & Client nutzen dieselben) ══

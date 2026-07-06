@@ -33,6 +33,14 @@ local function defaultProfile()
 		Skins = {}, -- gekaufte Charakter-Skins: { [skinId] = true }
 		EquippedSkin = "", -- Id des aktiven Skins ("" = keiner)
 		BaseLevel = 1, -- Tycoon-Ausbaustufe der Basis (Index in Config.BaseLevels)
+		-- Season-Pass-Fortschritt (resettet, wenn Id nicht mehr zu Config.SeasonPass.Id passt)
+		SeasonPass = {
+			Id = "", -- welche Season dieser Fortschritt gehört
+			Xp = 0, -- Gesamt-XP dieser Season
+			GrantedFree = 0, -- bis zu dieser Stufe wurden Free-Belohnungen ausgezahlt
+			GrantedPremium = 0, -- dito Premium-Spur
+			Premium = false, -- Premium-Pass freigeschaltet (Gamepass)
+		},
 	}
 end
 

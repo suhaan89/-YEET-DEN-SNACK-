@@ -19,7 +19,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local MergeService = {}
 
-local DataService, BaseService, MapService -- in Init verdrahtet
+local DataService, BaseService, MapService, SeasonPassService -- in Init verdrahtet
 
 local announceRemote: RemoteEvent
 local sfxRemote: RemoteEvent
@@ -90,6 +90,12 @@ local function doMerge(player: Player, snackName: any, count: any)
 	local chance = Config.MergeChance(count)
 	local success = math.random() < chance
 
+	-- Season-Pass-XP: Mut wird belohnt (Versuch), Erfolg extra
+	SeasonPassService.AddXp(player, "MergeTry")
+	if success then
+		SeasonPassService.AddXp(player, "MergeSuccess")
+	end
+
 	if success then
 		-- Zufälliger Snack aus der nächsthöheren Raritäts-Stufe
 		local pool = SnackTypes.ByRarity[nextRarity]
@@ -124,6 +130,7 @@ function MergeService.Init(services)
 	DataService = services.DataService
 	BaseService = services.BaseService
 	MapService = services.MapService
+	SeasonPassService = services.SeasonPassService
 
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent;

@@ -22,6 +22,11 @@ local trailDefsById: { [string]: any } = {}
 for _, def in Config.Trails do
 	trailDefsById[def.Id] = def
 end
+-- Season-Pass-Trails: ausrüstbar wie normale Trails, aber NICHT kaufbar
+-- (Seasonal = true -> buyTrail lehnt ab, verteilt werden sie vom SeasonPassService)
+for _, def in Config.SeasonTrails do
+	trailDefsById[def.Id] = def
+end
 
 local skinDefsById: { [string]: any } = {}
 for _, def in Config.Skins do
@@ -160,6 +165,9 @@ local function buyTrail(player: Player, trailId: any)
 		return { ok = false, msg = "Den Trail hast du schon!" }
 	end
 	local def = trailDefsById[trailId]
+	if def.Seasonal then
+		return { ok = false, msg = "Den gibt's nur als Season-Pass-Belohnung!" }
+	end
 	if not PlayerService.TrySpend(player, def.Cost) then
 		return { ok = false, msg = ("Zu wenig Cash! (%d💰 nötig)"):format(def.Cost) }
 	end

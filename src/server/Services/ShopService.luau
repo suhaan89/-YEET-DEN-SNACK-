@@ -12,7 +12,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local ShopService = {}
 
-local DataService, PlayerService, BaseService -- in Init verdrahtet
+local DataService, PlayerService, BaseService, SeasonPassService -- in Init verdrahtet
 local announceRemote: RemoteEvent
 
 local function buyUpgrade(player: Player, upgradeName: any)
@@ -74,6 +74,7 @@ local function doRebirth(player: Player)
 	PlayerService.ApplySpeed(player)
 	BaseService.RefreshLock(player)
 	BaseService.RefreshBuildout(player) -- Deko abreißen + Anzeige neu (Multiplikator/Level)
+	SeasonPassService.AddXp(player, "Rebirth") -- dicker Season-Pass-Schub für den Meilenstein
 
 	announceRemote:FireAllClients(
 		("🌟 SUGAR RUSH! %s hat Rebirth #%d erreicht! (+%d%% Einkommen)"):format(
@@ -100,6 +101,7 @@ function ShopService.Init(services)
 	DataService = services.DataService
 	PlayerService = services.PlayerService
 	BaseService = services.BaseService
+	SeasonPassService = services.SeasonPassService
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent;
 
 	(Remotes.Get("BuyUpgrade") :: RemoteFunction).OnServerInvoke = buyUpgrade;

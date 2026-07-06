@@ -170,6 +170,30 @@ local COMMANDS = {
 		end,
 	},
 	{
+		Id = "SeasonXp",
+		Label = "🎫 +500 Season-XP",
+		Handler = function(player, services)
+			services.SeasonPassService.DebugAddXp(player, 500)
+			return "+500 Season-XP – Stufen prasseln!"
+		end,
+	},
+	{
+		Id = "SeasonPremium",
+		Label = "👑 Premium-Pass togglen",
+		Handler = function(player, services)
+			local nowPremium = services.SeasonPassService.DebugTogglePremium(player)
+			return nowPremium and "Premium-Pass AN (Test) – Belohnungen kommen rückwirkend!" or "Premium-Pass AUS (Test)."
+		end,
+	},
+	{
+		Id = "FreeEgg",
+		Label = "🥚 Gratis Gold-Ei",
+		Handler = function(player, services)
+			local result = services.PetService.GrantEgg(player, "Golden")
+			return result.msg or "Ei geöffnet!"
+		end,
+	},
+	{
 		Id = "FillVault",
 		Label = "🏦 Tresor +20 Snacks",
 		Handler = function(player, services)
