@@ -128,6 +128,12 @@ local Config = {
 	},
 	AchievementCheckInterval = 10, -- Sekunden zwischen zwei Poll-Checks der Profil-Stats
 
+	-- ══ Freunde-Bonus ══
+	-- Spielt ein Roblox-Freund gleichzeitig im selben Server, bekommen BEIDE
+	-- einen passiven Einkommens-Boost aufs rohe Tresor-Einkommen (eigener
+	-- Zahl-Tick im FriendBonusService, unabhängig vom BaseService).
+	FriendBonusPercent = 0.1, -- +10% Tresor-Einkommen, solange mind. 1 Freund online ist
+
 	-- ══ Daten ══
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",

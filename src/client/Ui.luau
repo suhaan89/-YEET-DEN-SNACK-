@@ -1126,6 +1126,46 @@ local function buildSupremeBar()
 	refresh()
 end
 
+-- ══════════ Freundes-Bonus-Anzeige ══════════
+-- Kleines Badge unter der Supreme-Leiste, sichtbar solange mind. ein
+-- Roblox-Freund im Server ist (Attribut "FriendBonusCount" vom Server).
+
+local function buildFriendBonus()
+	local frame = Instance.new("Frame")
+	frame.Name = "FriendBonus"
+	frame.Position = UDim2.new(0, 12, 0, 120)
+	frame.Size = UDim2.fromOffset(190, 34)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 45, 35)
+	frame.BackgroundTransparency = 0.2
+	frame.Visible = false
+	roundify(frame, 12)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(90, 220, 130)
+	stroke.Thickness = 1.5
+	stroke.Transparency = 0.3
+	stroke.Parent = frame
+	frame.Parent = gui
+
+	local label = makeLabel(frame, {
+		Size = UDim2.new(1, -12, 1, -6),
+		Position = UDim2.fromOffset(6, 3),
+		Text = "",
+		TextColor3 = Color3.fromRGB(140, 240, 170),
+	})
+
+	local function refresh()
+		local count = player:GetAttribute("FriendBonusCount")
+		if typeof(count) == "number" and count > 0 then
+			frame.Visible = true
+			label.Text = ("🤝 Freundes-Bonus: +%d%%"):format(Config.FriendBonusPercent * 100)
+		else
+			frame.Visible = false
+		end
+	end
+	player:GetAttributeChangedSignal("FriendBonusCount"):Connect(refresh)
+	refresh()
+end
+
 -- ══════════ Debug-Menü (nur Entwickler) ══════════
 -- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
 -- Die Buttons kommen komplett vom Server (DebugCommand "list") – neue Commands
@@ -1821,6 +1861,7 @@ function Ui.Build()
 	})
 	buildMergeUi()
 	buildSupremeBar()
+	buildFriendBonus()
 	buildChargeBar()
 	buildSeasonPass()
 	buildAchievements()
