@@ -25,8 +25,9 @@ local function defaultProfile()
 		Upgrades = { Wurfkraft = 0, SlapPower = 0, Tempo = 0, Schloss = 0 },
 		Vault = {}, -- Liste von Snack-Namen (Strings), Details stehen in SnackTypes
 		TotalYeets = 0,
-		Pets = {}, -- gekaufte Pets: { [petId] = true }
-		EquippedPet = "", -- Id des ausgerüsteten Pets ("" = keins)
+		Pets = {}, -- gesammelte Pets (aus Eiern): { [petId] = true }
+		EquippedPet = "", -- LEGACY (Alt-Daten): einzelnes Pet – wird beim Join in EquippedPets migriert
+		EquippedPets = {}, -- Liste aktiver Pet-Ids (max. Config.PetMaxEquipped)
 		Trails = {}, -- gekaufte Trails: { [trailId] = true }
 		EquippedTrail = "", -- Id des aktiven Trails ("" = keiner)
 		Skins = {}, -- gekaufte Charakter-Skins: { [skinId] = true }

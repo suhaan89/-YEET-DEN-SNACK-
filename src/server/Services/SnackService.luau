@@ -458,8 +458,20 @@ local function onThrowRequest(player: Player, charge: any)
 		* (1 + level * Config.ThrowPowerPerLevel) -- Wurfkraft-Upgrade
 		* def.Slowdown -- schwere Snacks fliegen kürzer
 
+	-- Pet-Boost: Yeet-Pets geben extra Wurfkraft (Attribut setzt NUR der PetService)
+	local petYeet = player:GetAttribute("PetYeetBonus")
+	if typeof(petYeet) == "number" then
+		power *= 1 + petYeet
+	end
+
 	-- Sweet Spot: im goldenen Bereich losgelassen = PERFEKTER YEET!
-	if charge >= Config.SweetSpotStart then
+	-- (SweetSpot-Pets machen die goldene Zone breiter)
+	local sweetStart = Config.SweetSpotStart
+	local petSweet = player:GetAttribute("PetSweetSpotBonus")
+	if typeof(petSweet) == "number" then
+		sweetStart -= petSweet
+	end
+	if charge >= sweetStart then
 		power *= Config.SweetSpotBonus
 		notify(player, "🎯 PERFEKTER YEET!")
 		sfxRemote:FireClient(player, "ding")

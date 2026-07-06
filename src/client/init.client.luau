@@ -292,7 +292,16 @@ local function updateTrajectory(charge: number)
 		* (0.35 + 0.65 * charge)
 		* (1 + level * Config.ThrowPowerPerLevel)
 		* (def and def.Slowdown or 1)
-	if charge >= Config.SweetSpotStart then
+	local petYeet = player:GetAttribute("PetYeetBonus")
+	if typeof(petYeet) == "number" then
+		power *= 1 + petYeet
+	end
+	local sweetStart = Config.SweetSpotStart
+	local petSweet = player:GetAttribute("PetSweetSpotBonus")
+	if typeof(petSweet) == "number" then
+		sweetStart -= petSweet
+	end
+	if charge >= sweetStart then
 		power *= Config.SweetSpotBonus
 	end
 

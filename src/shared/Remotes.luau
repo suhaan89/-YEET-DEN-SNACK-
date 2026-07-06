@@ -20,8 +20,9 @@ local EVENTS = {
 local FUNCTIONS = {
 	"BuyUpgrade", -- Client -> Server: Upgrade kaufen, gibt {ok, msg} zurück
 	"DoRebirth", -- Client -> Server: Sugar-Rush-Rebirth
-	"BuyPet", -- Client -> Server: Pet kaufen (petId), gibt {ok, msg} zurück
-	"EquipPet", -- Client -> Server: Pet ausrüsten/ablegen (petId oder ""), gibt {ok, msg} zurück
+	"BuyPet", -- Client -> Server: (Legacy) Direktkauf – gibt nur noch einen Hinweis auf Eier zurück
+	"EquipPet", -- Client -> Server: Pet-Slot togglen (petId) bzw. alle ablegen (""), gibt {ok, msg} zurück
+	"BuyEgg", -- Client -> Server: Ei kaufen & öffnen (eggId), gibt {ok, msg, Pet?, Duplicate?, Refund?} zurück
 	"BuyTrail", -- Client -> Server: Trail kaufen (trailId), gibt {ok, msg} zurück
 	"EquipTrail", -- Client -> Server: Trail ausrüsten/ablegen (trailId oder ""), gibt {ok, msg} zurück
 	"BuySkin", -- Client -> Server: Charakter-Skin kaufen (skinId), gibt {ok, msg} zurück

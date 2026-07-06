@@ -49,9 +49,11 @@ local function powEffect(position: Vector3)
 end
 
 local function onSlap(player: Player)
-	-- Cooldown
+	-- Cooldown (SlapCooldown-Pets verkürzen ihn – Attribut setzt NUR der PetService)
 	local now = os.clock()
-	if now - (lastSlap[player] or 0) < Config.SlapCooldown then
+	local cdFactor = player:GetAttribute("PetSlapCooldownFactor")
+	local cooldown = Config.SlapCooldown * (if typeof(cdFactor) == "number" then cdFactor else 1)
+	if now - (lastSlap[player] or 0) < cooldown then
 		return
 	end
 
@@ -67,9 +69,10 @@ local function onSlap(player: Player)
 
 	lastSlap[player] = now
 
-	-- Nächstes Ziel in Reichweite suchen
+	-- Nächstes Ziel in Reichweite suchen (SlapRange-Pets verlängern den Arm)
+	local rangeBonus = player:GetAttribute("PetSlapRangeBonus")
 	local closest: Player? = nil
-	local closestDist = Config.SlapRange
+	local closestDist = Config.SlapRange + (if typeof(rangeBonus) == "number" then rangeBonus else 0)
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
 			local otherRoot = other.Character and other.Character:FindFirstChild("HumanoidRootPart") :: BasePart?

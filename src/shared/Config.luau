@@ -102,6 +102,83 @@ local Config = {
 	},
 	PetIncomeTick = 1, -- Sekunden zwischen Pet-Einkommens-Ticks
 
+	-- ══ Ei-Gacha (Pet-System 2.0) ══
+	-- Pets gibt es NICHT mehr direkt zu kaufen, sondern nur noch aus Eiern!
+	-- Die alte `Pets`-Liste oben bleibt für Alt-Daten stehen (Ids leben in
+	-- EggPets weiter, damit gekaufte Pets aus alten Spielständen erhalten bleiben).
+	PetMaxEquipped = 3, -- so viele Pets dürfen gleichzeitig ausgerüstet sein
+
+	-- Ei-Typen: Chances = relative Gewichte pro Rarität (müssen NICHT 100 ergeben)
+	Eggs = {
+		{
+			Id = "Basic",
+			Name = "🥚 Snack-Ei",
+			Cost = 750,
+			Color = Color3.fromRGB(240, 230, 200),
+			Desc = "Riecht nach Keks. Meistens auch nur Keks drin.",
+			Chances = { Common = 64, Rare = 25, Epic = 9, Legendary = 1.9, Mythic = 0.1 },
+		},
+		{
+			Id = "Golden",
+			Name = "🌟 Gold-Ei",
+			Cost = 8000,
+			Color = Color3.fromRGB(255, 210, 60),
+			Desc = "Glänzt verdächtig. Deutlich bessere Chancen!",
+			Chances = { Common = 30, Rare = 40, Epic = 22, Legendary = 7, Mythic = 1 },
+		},
+		{
+			Id = "Mutant",
+			Name = "☢️ Mutanten-Ei",
+			Cost = 60000,
+			Color = Color3.fromRGB(110, 255, 40),
+			Desc = "Wackelt von alleine. KEINE Commons – Ehrenwort!",
+			Chances = { Rare = 30, Epic = 40, Legendary = 24, Mythic = 6 },
+		},
+	},
+
+	-- Anzeige-Reihenfolge der Pet-Raritäten (Farben kommen aus SnackTypes.RarityColors)
+	PetRarityOrder = { "Common", "Rare", "Epic", "Legendary", "Mythic" },
+
+	-- Duplikat gezogen? Gibt's Trostpflaster-Cash nach Rarität.
+	PetDuplicateRefund = { Common = 100, Rare = 500, Epic = 2500, Legendary = 12000, Mythic = 40000 },
+
+	-- Der komplette Pet-Pool. Ability.Type:
+	--   Income       = +Value Cash/s (flach, mit Rebirth-Multiplikator)
+	--   CashMult     = +Value*100% aufs Tresor-Einkommen (zahlt der Pet-Tick oben drauf)
+	--   Yeet         = +Value*100% Wurfkraft
+	--   Speed        = +Value WalkSpeed
+	--   SlapRange    = +Value Studs Slap-Reichweite
+	--   SlapCooldown = -Value*100% Slap-Cooldown
+	--   SweetSpot    = Sweet-Spot-Zone wird um Value (Anteil vom Balken) breiter
+	-- Exclusive = true -> fällt NICHT aus Eiern (nur Season-Pass o.ä.)
+	EggPets = {
+		-- Common
+		{ Id = "Hamster", Name = "🐹 Schoko-Hamster", Rarity = "Common", Ability = { Type = "Income", Value = 1 }, Color = Color3.fromRGB(160, 100, 50), Desc = "Knabbert Krümel zu Cash. +1💰/s" },
+		{ Id = "Zuckermaus", Name = "🐭 Puderzucker-Maus", Rarity = "Common", Ability = { Type = "Yeet", Value = 0.05 }, Color = Color3.fromRGB(235, 235, 245), Desc = "Niest Puderzucker. +5% Wurfkraft" },
+		{ Id = "Kekskueken", Name = "🐤 Keks-Küken", Rarity = "Common", Ability = { Type = "Speed", Value = 2 }, Color = Color3.fromRGB(255, 220, 90), Desc = "Piept motivierend. +2 Tempo" },
+		{ Id = "Lakritzschnecke", Name = "🐌 Lakritz-Schnecke", Rarity = "Common", Ability = { Type = "CashMult", Value = 0.05 }, Color = Color3.fromRGB(40, 35, 40), Desc = "Langsam, aber geschäftstüchtig. +5% Tresor-Einkommen" },
+		-- Rare
+		{ Id = "Dackel", Name = "🌭 Donut-Dackel", Rarity = "Rare", Ability = { Type = "Income", Value = 5 }, Color = Color3.fromRGB(255, 150, 200), Desc = "Halb Hund, halb Donut. +5💰/s" },
+		{ Id = "Brezelboxer", Name = "🥨 Brezel-Boxer", Rarity = "Rare", Ability = { Type = "SlapRange", Value = 2 }, Color = Color3.fromRGB(190, 130, 60), Desc = "Trainiert deine Schlaghand. +2 Studs Slap-Reichweite" },
+		{ Id = "Waffelpinguin", Name = "🐧 Waffel-Pinguin", Rarity = "Rare", Ability = { Type = "SweetSpot", Value = 0.03 }, Color = Color3.fromRGB(80, 80, 100), Desc = "Watschelt im Takt. Sweet-Spot +3% breiter" },
+		{ Id = "Brausefrosch", Name = "🐸 Brause-Frosch", Rarity = "Rare", Ability = { Type = "Speed", Value = 4 }, Color = Color3.fromRGB(120, 255, 120), Desc = "Prickelt beim Hüpfen. +4 Tempo" },
+		-- Epic
+		{ Id = "Einhorn", Name = "🦄 Zucker-Einhorn", Rarity = "Epic", Ability = { Type = "Income", Value = 20 }, Color = Color3.fromRGB(220, 160, 255), Desc = "Pupst Puderzucker. +20💰/s" },
+		{ Id = "Toffeeschildi", Name = "🐢 Toffee-Turbo-Schildkröte", Rarity = "Epic", Ability = { Type = "Yeet", Value = 0.12 }, Color = Color3.fromRGB(120, 200, 90), Desc = "Klebriger Rückenwind. +12% Wurfkraft" },
+		{ Id = "Marshmallowgeist", Name = "👻 Marshmallow-Geist", Rarity = "Epic", Ability = { Type = "SlapCooldown", Value = 0.2 }, Color = Color3.fromRGB(255, 250, 250), Desc = "Spukt in deiner Schlaghand. -20% Slap-Cooldown" },
+		{ Id = "Bonbonfuchs", Name = "🦊 Bonbon-Fuchs", Rarity = "Epic", Ability = { Type = "CashMult", Value = 0.12 }, Color = Color3.fromRGB(255, 140, 60), Desc = "Schlau UND süß. +12% Tresor-Einkommen" },
+		-- Legendary
+		{ Id = "Drache", Name = "🐉 Kakao-Drache", Rarity = "Legendary", Ability = { Type = "Income", Value = 90 }, Color = Color3.fromRGB(120, 60, 200), Desc = "Speit heiße Schokolade. +90💰/s" },
+		{ Id = "Gummigorilla", Name = "🦍 Gummi-Gorilla", Rarity = "Legendary", Ability = { Type = "SlapRange", Value = 4 }, Color = Color3.fromRGB(255, 80, 80), Desc = "Trommelt auf der Gummibrust. +4 Studs Slap-Reichweite" },
+		{ Id = "Karamellfalke", Name = "🦅 Karamell-Falke", Rarity = "Legendary", Ability = { Type = "Yeet", Value = 0.2 }, Color = Color3.fromRGB(230, 170, 80), Desc = "Gibt Flugstunden. +20% Wurfkraft" },
+		{ Id = "Sahnekuh", Name = "🐮 Sahne-Sturm-Kuh", Rarity = "Legendary", Ability = { Type = "CashMult", Value = 0.25 }, Color = Color3.fromRGB(250, 245, 235), Desc = "Muht Geld herbei. +25% Tresor-Einkommen" },
+		-- Mythic
+		{ Id = "Riegelbot", Name = "🤖 Riegel-Bot 9000", Rarity = "Mythic", Ability = { Type = "Income", Value = 400 }, Color = Color3.fromRGB(140, 150, 170), Desc = "Druckt Riegel. Legal? Egal! +400💰/s" },
+		{ Id = "Galaxienglibber", Name = "🐙 Galaxien-Glibber", Rarity = "Mythic", Ability = { Type = "CashMult", Value = 0.5 }, Color = Color3.fromRGB(90, 40, 180), Desc = "Aus Dimension X importiert. +50% Tresor-Einkommen" },
+		{ Id = "Vanillerex", Name = "🦖 Vulkan-Vanille-Rex", Rarity = "Mythic", Ability = { Type = "Yeet", Value = 0.35 }, Color = Color3.fromRGB(255, 100, 40), Desc = "RAWR = +35% Wurfkraft" },
+		{ Id = "Phoenix", Name = "🔥 Zucker-Phönix", Rarity = "Mythic", Ability = { Type = "CashMult", Value = 0.75 }, Color = Color3.fromRGB(255, 60, 60), Desc = "Season-1-Exklusiv! +75% Tresor-Einkommen", Exclusive = true },
+	},
+
 	-- ══ Style-Shop (Skins) ══
 	-- Ganzkörper-Skins: färben alle Körperteile um (Material/Transparenz inklusive).
 	-- Nur EINER gleichzeitig aktiv, rein kosmetisch.
@@ -138,8 +215,10 @@ local Config = {
 	SupremeSnackCount = 2, -- ca. so viele Supreme-Snacks droppt der Event-Truck
 
 	-- ══ Debug/Test-Menü ══
-	-- Im Studio ist das Menü IMMER sichtbar. Für Live-Server hier UserIds eintragen:
-	DebugUserIds = {} :: { number },
+	-- Im Studio ist das Menü IMMER sichtbar. Für Team Test/Live-Server hier UserIds eintragen:
+	DebugUserIds = {
+		1165289346, -- Rojan
+	} :: { number },
 }
 
 -- Kosten für das nächste Level eines Upgrades
@@ -175,6 +254,35 @@ function Config.MergeChance(count: number): number
 		Config.MergeMaxChance,
 		Config.MergeBaseChance + (count - Config.MergeMinCount) * Config.MergeChancePerExtra
 	)
+end
+
+-- ══ Abgeleitete Lookups (Server & Client nutzen dieselben) ══
+
+Config.EggsById = {} :: { [string]: any }
+for _, def in Config.Eggs do
+	Config.EggsById[def.Id] = def
+end
+
+Config.EggPetsById = {} :: { [string]: any }
+for _, def in Config.EggPets do
+	Config.EggPetsById[def.Id] = def
+end
+
+-- Chancen eines Eis als normalisierte Prozente (fürs UI, immer synchron zum Server-Wurf)
+function Config.EggChancePercents(eggId: string): { [string]: number }
+	local def = Config.EggsById[eggId]
+	local result = {}
+	if not def then
+		return result
+	end
+	local total = 0
+	for _, weight in def.Chances do
+		total += weight
+	end
+	for rarity, weight in def.Chances do
+		result[rarity] = weight / total * 100
+	end
+	return result
 end
 
 return Config

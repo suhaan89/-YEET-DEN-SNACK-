@@ -661,6 +661,17 @@ end
 
 -- ══════════ YEET-Ladebalken & Halte-Hinweis ══════════
 
+-- Sweet-Spot-Start inkl. Pet-Bonus (SweetSpot-Pets machen die Zone breiter;
+-- das Attribut setzt der Server, wir zeigen es nur an)
+local function effectiveSweetSpotStart(): number
+	local start = Config.SweetSpotStart
+	local petSweet = player:GetAttribute("PetSweetSpotBonus")
+	if typeof(petSweet) == "number" then
+		start -= petSweet
+	end
+	return start
+end
+
 local function buildChargeBar()
 	chargeBarBg = Instance.new("Frame")
 	chargeBarBg.AnchorPoint = Vector2.new(0.5, 1)
@@ -672,14 +683,20 @@ local function buildChargeBar()
 	chargeBarBg.Parent = gui
 
 	-- Goldene Sweet-Spot-Zone: hier loslassen = PERFEKTER YEET
+	-- (wächst live mit, wenn ein SweetSpot-Pet ausgerüstet wird)
 	local sweetZone = Instance.new("Frame")
-	sweetZone.Position = UDim2.fromScale(Config.SweetSpotStart, 0)
-	sweetZone.Size = UDim2.fromScale(1 - Config.SweetSpotStart, 1)
 	sweetZone.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 	sweetZone.BackgroundTransparency = 0.45
 	sweetZone.ZIndex = 2
 	roundify(sweetZone, 10)
 	sweetZone.Parent = chargeBarBg
+	local function refreshSweetZone()
+		local start = effectiveSweetSpotStart()
+		sweetZone.Position = UDim2.fromScale(start, 0)
+		sweetZone.Size = UDim2.fromScale(1 - start, 1)
+	end
+	player:GetAttributeChangedSignal("PetSweetSpotBonus"):Connect(refreshSweetZone)
+	refreshSweetZone()
 
 	chargeBarFill = Instance.new("Frame")
 	chargeBarFill.Size = UDim2.fromScale(0, 1)
@@ -719,7 +736,7 @@ end
 
 function Ui.SetCharge(fraction: number)
 	chargeBarFill.Size = UDim2.fromScale(fraction, 1)
-	if fraction >= Config.SweetSpotStart then
+	if fraction >= effectiveSweetSpotStart() then
 		-- Im Sweet Spot: GOLD! Jetzt loslassen!
 		chargeBarFill.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 	else
