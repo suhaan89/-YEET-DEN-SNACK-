@@ -194,6 +194,14 @@ local COMMANDS = {
 		end,
 	},
 	{
+		Id = "GoldenNow",
+		Label = "🌟 Goldener Snack JETZT",
+		Handler = function(_player, services)
+			services.GoldenSnackService.DebugSpawnNow()
+			return "Goldener Snack ist gespawnt – lauf!"
+		end,
+	},
+	{
 		Id = "FillVault",
 		Label = "🏦 Tresor +20 Snacks",
 		Handler = function(player, services)

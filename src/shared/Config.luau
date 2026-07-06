@@ -87,6 +87,18 @@ local Config = {
 	PlaytimeGiftInterval = 240, -- alle X Sekunden Spielzeit gibt's einen Geschenk-Snack
 	SpawnProtection = 4, -- Sekunden ForceField nach dem Spawnen
 
+	-- ══ Goldener Snack (Zufalls-Minievent) ══
+	-- Spawnt unabhängig vom Truck-Timer irgendwo auf der Map und leuchtet weithin
+	-- sichtbar. Wer ihn ZUERST berührt, kassiert den Bonus (Server entscheidet).
+	GoldenSnack = {
+		IntervalMin = 120, -- Sekunden bis zum nächsten Spawn (Minimum)
+		IntervalMax = 240, -- ... und Maximum (wird zufällig gewürfelt)
+		Lifetime = 25, -- so lange bleibt er liegen, dann poff
+		CashBase = 1500, -- Basis-Belohnung (wird mit dem Rebirth-Multiplikator skaliert)
+		SpawnAreaX = 250, -- Spawn-Bereich: |x| < Wert (begehbare Map, innerhalb der Basen-Reihen)
+		SpawnAreaZ = 150, -- Spawn-Bereich: |z| < Wert
+	},
+
 	-- ══ Daten ══
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",
@@ -238,6 +250,7 @@ local Config = {
 			MergeSuccess = 30, -- Merge geglückt
 			Rebirth = 400, -- Sugar Rush
 			EggOpen = 15, -- Ei im Pet-Shop geöffnet
+			GoldenSnack = 40, -- Goldenen Snack als Erster geschnappt
 		},
 
 		-- Belohnungen pro Stufe. Typen:
