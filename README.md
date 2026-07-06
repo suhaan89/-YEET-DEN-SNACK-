@@ -52,6 +52,22 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
    Season-exklusive Trails sind nicht kaufbar, nur erspielbar.
 15. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
    Spiel-Besitzer (bzw. Gruppen-Rang ≥254) + UserIds aus `Config.DebugUserIds`.
+16. 🌟 **Goldener Snack**: Alle 2–4 Minuten (unabhängig vom Truck!) spawnt
+   irgendwo ein goldener Snack mit Leuchtsäule. Wer ihn ZUERST berührt/[E]
+   drückt, kassiert einen Cash-Bonus (×Rebirth-Multiplikator) + Pass-XP.
+17. 🏅 **Achievements**: 12 Meilensteine (`Config.Achievements`) – Einlagern,
+   Rebirths, Tresor knacken, Legendary-Pet, perfekte Yeets u.v.m. Serverseitig
+   getrackt (eigener DataStore), vorbereitet für echte Roblox-Badges
+   (BadgeIds eintragen!). Eigenes 🏅-Panel im UI.
+18. 👫 **Freunde-Bonus**: Spielt ein Roblox-Freund im selben Server, kriegen
+   BEIDE +10 % aufs Tresor-Einkommen (`Config.FriendBonusPercent`), solange
+   beide online sind – mit Anzeige im UI.
+19. 🤝 **Referral-System**: Jeder hat den festen Code `SNACK-<UserId>` (👥-Menü).
+   Neue Spieler (vor Rebirth 1) lösen ihn ein; schafft der Eingeladene
+   Rebirth 1, bekommt der EINLADER 10k💰 + Gold-Ei (offline-sicher gespeichert).
+20. 🏡 **Basis-Deko**: 8 kaufbare Süßigkeiten-Props (`Config.HousingDecor`,
+   Zuckerstange bis Disco-Bonbon) für 6 feste Slots rund um die eigene Basis –
+   rein kosmetisch, persistent, wird beim Join automatisch wieder aufgebaut.
 
 ## Entwicklung
 
@@ -91,6 +107,11 @@ src/server/   → ServerScriptService.Server
                            Gamepass-Check (MarketplaceService)
   Services/StyleService    Trails + Ganzkörper-Skins (kosmetisch, inkl. Season-Trails)
   Services/MergeService    Merge-Maschine (2+ gleiche Snacks -> Chance auf seltener)
+  Services/GoldenSnackService  Goldener Snack (Zufalls-Minievent, Cash für den Ersten)
+  Services/AchievementService  Meilensteine + Badge-Vergabe (eigener DataStore)
+  Services/FriendService   Freunde-Bonus (+10% Einkommen bei Freund im Server)
+  Services/ReferralService Einladungs-Codes + Prämie bei Rebirth 1 (eigener DataStore)
+  Services/HousingService  Basis-Deko: kaufen, Slots, persistenter Wiederaufbau
   Services/DebugService    Admin-/Test-Menü (Studio, Spiel-Besitzer, Whitelist)
 
 src/client/   → StarterPlayerScripts
@@ -119,3 +140,6 @@ src/client/   → StarterPlayerScripts
 6. **Premium-Pass-Gamepass** im Creator Dashboard anlegen und die Id in
    `Config.SeasonPass.GamepassId` eintragen (solange 0: Kauf-Button zeigt
    nur einen Hinweis-Toast).
+7. **Achievement-Badges** im Creator Dashboard anlegen (Spiel -> Engagement
+   -> Badges, eine pro Eintrag in `Config.Achievements`) und die BadgeIds
+   dort eintragen (solange 0: Freischaltung nur intern, keine Roblox-Badge).
