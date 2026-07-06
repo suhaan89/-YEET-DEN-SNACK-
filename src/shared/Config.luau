@@ -102,6 +102,30 @@ local Config = {
 	-- Spawn-Rechteck: deckt Plaza + Straße + Wiese ab, spart Basen (z=±120) und Shops (z=±80) aus
 	GoldenSnackArea = { MinX = -200, MaxX = 200, MinZ = -60, MaxZ = 60 },
 
+	-- ══ Achievements/Badges ══
+	-- Meilensteine, serverseitig getrackt (eigener DataStore, AchievementService).
+	-- Stat = welcher Zähler, Goal = Ziel-Wert für die Freischaltung.
+	--
+	-- TODO (Creator Dashboard): Für jedes Achievement eine echte Roblox-Badge
+	-- anlegen (creator.roblox.com -> Spiel -> Engagement -> Badges) und die
+	-- Badge-Id hier bei BadgeId eintragen! Solange BadgeId = 0 ist, wird nur
+	-- intern freigeschaltet (Popup + Speicherung), aber keine Badge vergeben.
+	AchievementDataStore = "YeetDenSnack_Achievements_v1",
+	Achievements = {
+		{ Id = "FirstBank", Name = "🍪 Erster Streich", Desc = "Lagere deinen ersten Snack im Tresor ein.", Stat = "Banked", Goal = 1, BadgeId = 0 },
+		{ Id = "Bank100", Name = "🏦 Snack-Horter", Desc = "Lagere insgesamt 100 Snacks ein.", Stat = "Banked", Goal = 100, BadgeId = 0 },
+		{ Id = "Bank500", Name = "🏰 Zucker-Baron", Desc = "Lagere insgesamt 500 Snacks ein.", Stat = "Banked", Goal = 500, BadgeId = 0 },
+		{ Id = "FirstRebirth", Name = "🌟 Sugar Rush!", Desc = "Schaffe deinen ersten Rebirth.", Stat = "Rebirths", Goal = 1, BadgeId = 0 },
+		{ Id = "Rebirth5", Name = "🌈 Zucker-Junkie", Desc = "Erreiche Rebirth 5.", Stat = "Rebirths", Goal = 5, BadgeId = 0 },
+		{ Id = "FirstCrack", Name = "😈 Tresor-Knacker", Desc = "Knacke zum ersten Mal einen fremden Tresor.", Stat = "Cracks", Goal = 1, BadgeId = 0 },
+		{ Id = "FirstLegendaryPet", Name = "🐉 Legenden-Zieher", Desc = "Ziehe ein Legendary- oder Mythic-Pet aus einem Ei.", Stat = "LegendaryPets", Goal = 1, BadgeId = 0 },
+		{ Id = "Eggs25", Name = "🥚 Eierkopf", Desc = "Öffne 25 Eier im Pet-Shop.", Stat = "EggsOpened", Goal = 25, BadgeId = 0 },
+		{ Id = "PerfectYeet50", Name = "🎯 Yeet-Präzision", Desc = "Lande 50 PERFEKTE Yeets (goldene Zone!).", Stat = "PerfectYeets", Goal = 50, BadgeId = 0 },
+		{ Id = "Slap100", Name = "👋 Slap-Maschine", Desc = "Slappe 100 Spieler weg.", Stat = "Slaps", Goal = 100, BadgeId = 0 },
+		{ Id = "FirstMerge", Name = "🧪 Mutations-Meister", Desc = "Schaffe deinen ersten erfolgreichen Merge.", Stat = "Merges", Goal = 1, BadgeId = 0 },
+		{ Id = "GoldenGrab", Name = "🌟 Goldjunge", Desc = "Schnapp dir einen goldenen Snack.", Stat = "GoldenSnacks", Goal = 1, BadgeId = 0 },
+	},
+
 	-- ══ Pet-Shop ══
 	-- Pets sind schwebende Begleiter, die passiv Cash generieren (skaliert mit Rebirth-Multiplikator).
 	-- Nur EIN Pet gleichzeitig ausgerüstet.

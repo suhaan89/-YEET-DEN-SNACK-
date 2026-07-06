@@ -1520,6 +1520,108 @@ local function buildSeasonPass()
 	refreshPass()
 end
 
+-- ══════════ Achievements ══════════
+-- Rein anzeigend: Stats + Freischaltungen kommen per GetAchievements vom
+-- Server (AchievementService trackt & vergibt – hier wird nur gerendert).
+
+local function buildAchievements()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "AchievementToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 116) -- unter Hilfe (12) und Pass (64)
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(200, 170, 60)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🏅"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🏅 ACHIEVEMENTS", Vector2.new(460, 520), Color3.fromRGB(255, 215, 0))
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 48)
+	list.Size = UDim2.new(1, -24, 1, -60)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- Eine Zeile pro Achievement, Fortschritt/Häkchen füllt refresh()
+	local rows: { [string]: { Row: Frame, Name: TextLabel, Progress: TextLabel } } = {}
+	for i, def in Config.Achievements do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 52)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = i
+		roundify(row, 10)
+		row.Parent = list
+
+		local nameLabel = makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -110, 0, 24),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Name,
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 30),
+			Size = UDim2.new(1, -110, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Desc,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+		})
+		local progress = makeLabel(row, {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10, 0.5, 0),
+			Size = UDim2.fromOffset(90, 30),
+			Text = "…",
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+		})
+		rows[def.Id] = { Row = row, Name = nameLabel, Progress = progress }
+	end
+
+	local function refresh()
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return (Remotes.Get("GetAchievements") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(data) ~= "table" then
+				return
+			end
+			for _, def in Config.Achievements do
+				local refs = rows[def.Id]
+				if not refs then
+					continue
+				end
+				local unlocked = data.Unlocked and data.Unlocked[def.Id] == true
+				local value = math.min(data.Stats and data.Stats[def.Stat] or 0, def.Goal)
+				refs.Row.BackgroundColor3 = if unlocked then Color3.fromRGB(45, 70, 50) else Color3.fromRGB(55, 48, 70)
+				refs.Progress.Text = if unlocked then "✅" else ("%d/%d"):format(value, def.Goal)
+				refs.Progress.TextColor3 = if unlocked
+					then Color3.fromRGB(140, 230, 160)
+					else Color3.fromRGB(190, 190, 200)
+			end
+		end)
+	end
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -1657,6 +1759,7 @@ function Ui.Build()
 	buildSupremeBar()
 	buildChargeBar()
 	buildSeasonPass()
+	buildAchievements()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

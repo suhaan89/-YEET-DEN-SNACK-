@@ -18,7 +18,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local SnackService = {}
 
-local BaseService, PlayerService, DataService, SeasonPassService -- in Init verdrahtet
+local BaseService, PlayerService, DataService, SeasonPassService, AchievementService -- in Init verdrahtet
 
 local snackFolder: Folder
 local entries: { [BasePart]: any } = {} -- alle aktiven Snack-Parts
@@ -189,6 +189,7 @@ local function bank(entry, owner: Player)
 	if def.Announce then
 		SeasonPassService.AddXp(owner, "BankRareBonus")
 	end
+	AchievementService.Track(owner, "Banked", 1)
 
 	-- Combo: mehrere Snacks kurz nacheinander einlagern = Bonus-Cash
 	local now = os.clock()
@@ -482,6 +483,7 @@ local function onThrowRequest(player: Player, charge: any)
 		notify(player, "🎯 PERFEKTER YEET!")
 		sfxRemote:FireClient(player, "ding")
 		SeasonPassService.AddXp(player, "PerfectYeet")
+		AchievementService.Track(player, "PerfectYeets", 1)
 	end
 	sfxRemote:FireAllClients("throw", root.Position)
 
@@ -577,6 +579,7 @@ function SnackService.Init(services)
 	PlayerService = services.PlayerService
 	DataService = services.DataService
 	SeasonPassService = services.SeasonPassService
+	AchievementService = services.AchievementService
 
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	notifyRemote = Remotes.Get("Notify") :: RemoteEvent

@@ -30,6 +30,7 @@ local FUNCTIONS = {
 	"GetCollections", -- Client -> Server: eigene Pets/Trails + Ausrüstung abfragen
 	"GetVault", -- Client -> Server: eigenen Tresor-Inhalt abfragen (Liste von Snack-Namen)
 	"DoMerge", -- Client -> Server: Merge versuchen (snackName, count), gibt {ok, success?, msg} zurück
+	"GetAchievements", -- Client -> Server: eigene Achievement-Stats + Freischaltungen abfragen
 	"DebugCommand", -- Client -> Server: Debug-Menü ("list" oder Command-Id) – nur Whitelist/Studio!
 }
 
