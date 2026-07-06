@@ -41,7 +41,16 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
    Gold-Tresor, Leuchtsäule). Rebirth setzt den Ausbau zurück auf Camp.
 12. 🧍 **Skins** im Style-Shop: Ganzkörper-Umfärbung (Schoko, Gummibärchen,
    Gold, Mutanten-Glibber) – rein kosmetisch, überlebt Respawns.
-13. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
+13. 🥚 **Ei-Gacha-Pets** im Pet-Shop: Eier kaufen (Snack-/Gold-/Mutanten-Ei,
+   `Config.Eggs`), Server würfelt ein Pet aus 5 Raritäten (`Config.EggPets`,
+   ~20 Stück). Bis zu **3 Pets gleichzeitig** ausgerüstet, jedes gibt einen
+   Boost (Cash/s, Tresor-%, Wurfkraft, Tempo, Slap-Reichweite/-Cooldown,
+   breiterer Sweet-Spot). Duplikate → Trost-Cash. Reveal-Animation beim Öffnen.
+14. 🎫 **Season-Pass** (`Config.SeasonPass`): XP durch Einlagern, Perfekte
+   Yeets, Merges, Eier & Rebirths. 35 Stufen, Free-Spur für alle + Premium-Spur
+   per Robux-Gamepass (bessere Belohnungen, exklusiver Zucker-Phönix auf 35).
+   Season-exklusive Trails sind nicht kaufbar, nur erspielbar.
+15. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
    Spiel-Besitzer (bzw. Gruppen-Rang ≥254) + UserIds aus `Config.DebugUserIds`.
 
 ## Entwicklung
@@ -76,8 +85,11 @@ src/server/   → ServerScriptService.Server
   Services/TruckService    Truck-Event (räumliche Abfragen statt .Touched!), Rush Hour
   Services/ShopService     Upgrades + Rebirth (serverseitig validiert)
   Services/RewardService   Spielzeit-Geschenke (alle 4 Min ein Snack in den Tresor)
-  Services/PetService      Pets (passive Einkommens-Begleiter) + GetCollections-Remote
-  Services/StyleService    Trails + Ganzkörper-Skins (kosmetisch)
+  Services/PetService      Ei-Gacha: Eier öffnen, Pet-Boosts (als Attribute),
+                           Begleiter-Following + GetCollections-Remote
+  Services/SeasonPassService  Season-Pass: XP-Vergabe, Stufen-Belohnungen,
+                           Gamepass-Check (MarketplaceService)
+  Services/StyleService    Trails + Ganzkörper-Skins (kosmetisch, inkl. Season-Trails)
   Services/MergeService    Merge-Maschine (2+ gleiche Snacks -> Chance auf seltener)
   Services/DebugService    Admin-/Test-Menü (Studio, Spiel-Besitzer, Whitelist)
 
@@ -104,3 +116,6 @@ src/client/   → StarterPlayerScripts
    es keinen Built-in-Sound. Optional alle SoundFx-Ids gegen bessere tauschen.
 4. Platzhalter-Parts durch **Meshes** ersetzen (Truck, Snacks, Tresor).
 5. UI-Polish, Game-Icon, Thumbnail.
+6. **Premium-Pass-Gamepass** im Creator Dashboard anlegen und die Id in
+   `Config.SeasonPass.GamepassId` eintragen (solange 0: Kauf-Button zeigt
+   nur einen Hinweis-Toast).
