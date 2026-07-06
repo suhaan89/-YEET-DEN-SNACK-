@@ -61,6 +61,12 @@ end);
 	Ui.Toast(text)
 end);
 
+(Remotes.Get("AchievementUnlocked") :: RemoteEvent).OnClientEvent:Connect(function(name, desc)
+	if typeof(name) == "string" then
+		Ui.AchievementPopup(name, if typeof(desc) == "string" then desc else "")
+	end
+end);
+
 -- ══════════ Basis-Flash bei Treffer ══════════
 -- Landet ein Snack in einer Basis-Zone, leuchtet die getroffene Basis kurz auf.
 -- Getriggert über das "bank"-Sound-Event (kommt mit der Einschlag-Position).

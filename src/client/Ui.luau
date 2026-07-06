@@ -1520,6 +1520,172 @@ local function buildSeasonPass()
 	refreshPass()
 end
 
+-- ══════════ Achievements ══════════
+-- Popup beim Freischalten (kommt vom AchievementUnlocked-Remote) + Trophäen-
+-- Fenster mit allen Meilensteinen. Freigeschaltet-Status via GetAchievements.
+
+local achievementQueue: { { Name: string, Desc: string } } = {}
+local achievementShowing = false
+
+local function processAchievementQueue()
+	if achievementShowing then
+		return
+	end
+	achievementShowing = true
+	task.spawn(function()
+		while #achievementQueue > 0 do
+			local item = table.remove(achievementQueue, 1)
+
+			local popup = Instance.new("Frame")
+			popup.AnchorPoint = Vector2.new(0.5, 0)
+			popup.Position = UDim2.new(0.5, 0, 0, -110)
+			popup.Size = UDim2.fromOffset(400, 88)
+			popup.BackgroundColor3 = Color3.fromRGB(45, 40, 25)
+			popup.ZIndex = 15
+			roundify(popup, 14)
+			local stroke = Instance.new("UIStroke")
+			stroke.Color = Color3.fromRGB(255, 215, 0)
+			stroke.Thickness = 2
+			stroke.Parent = popup
+			popup.Parent = gui
+
+			makeLabel(popup, {
+				Position = UDim2.fromOffset(0, 6),
+				Size = UDim2.new(1, 0, 0, 24),
+				Text = "🏆 ACHIEVEMENT FREIGESCHALTET!",
+				TextColor3 = Color3.fromRGB(255, 215, 0),
+				ZIndex = 16,
+			})
+			makeLabel(popup, {
+				Position = UDim2.fromOffset(0, 32),
+				Size = UDim2.new(1, 0, 0, 28),
+				Text = item.Name,
+				TextColor3 = Color3.new(1, 1, 1),
+				ZIndex = 16,
+			})
+			makeLabel(popup, {
+				Position = UDim2.fromOffset(0, 60),
+				Size = UDim2.new(1, -16, 0, 22),
+				Text = item.Desc,
+				TextColor3 = Color3.fromRGB(210, 205, 190),
+				TextScaled = false,
+				TextSize = 14,
+				ZIndex = 16,
+			})
+
+			-- Unterhalb des Announce-Banners einschweben, kurz zeigen, weg
+			TweenService:Create(popup, TweenInfo.new(0.4, Enum.EasingStyle.Back), {
+				Position = UDim2.new(0.5, 0, 0, 176),
+			}):Play()
+			task.wait(3.4)
+			local out = TweenService:Create(popup, TweenInfo.new(0.3), { Position = UDim2.new(0.5, 0, 0, -110) })
+			out:Play()
+			out.Completed:Wait()
+			popup:Destroy()
+		end
+		achievementShowing = false
+	end)
+end
+
+function Ui.AchievementPopup(name: string, desc: string)
+	table.insert(achievementQueue, { Name = name, Desc = desc })
+	processAchievementQueue()
+end
+
+local function buildAchievements()
+	-- Button rechts, unter dem Season-Pass-Knopf
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "AchievementToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 116)
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(180, 150, 40)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🏆"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🏆 ACHIEVEMENTS", Vector2.new(470, 500), Color3.fromRGB(255, 215, 0))
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 48)
+	list.Size = UDim2.new(1, -24, 1, -60)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- Eine Zeile pro Meilenstein; refresh() färbt anhand des Server-Stands
+	local rows: { [string]: { Row: Frame, Name: TextLabel, Desc: TextLabel } } = {}
+	for i, def in Config.Achievements do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 52)
+		row.BackgroundColor3 = Color3.fromRGB(40, 36, 50)
+		row.LayoutOrder = i
+		roundify(row, 10)
+		row.Parent = list
+
+		local nameLabel = makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -20, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = "🔒 " .. def.Name,
+			TextColor3 = Color3.fromRGB(150, 145, 165),
+		})
+		local descLabel = makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -20, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Desc,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+		})
+		rows[def.Id] = { Row = row, Name = nameLabel, Desc = descLabel }
+	end
+
+	local function refresh()
+		task.spawn(function()
+			local ok, unlocked = pcall(function()
+				return (Remotes.Get("GetAchievements") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(unlocked) ~= "table" then
+				return
+			end
+			local count = 0
+			for _, def in Config.Achievements do
+				local refs = rows[def.Id]
+				if unlocked[def.Id] then
+					count += 1
+					refs.Row.BackgroundColor3 = Color3.fromRGB(55, 60, 40)
+					refs.Name.Text = "✅ " .. def.Name
+					refs.Name.TextColor3 = Color3.fromRGB(255, 215, 0)
+				else
+					refs.Row.BackgroundColor3 = Color3.fromRGB(40, 36, 50)
+					refs.Name.Text = "🔒 " .. def.Name
+					refs.Name.TextColor3 = Color3.fromRGB(150, 145, 165)
+				end
+			end
+			toggle.Text = count >= #Config.Achievements and "👑" or "🏆"
+		end)
+	end
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -1657,6 +1823,7 @@ function Ui.Build()
 	buildSupremeBar()
 	buildChargeBar()
 	buildSeasonPass()
+	buildAchievements()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

@@ -28,6 +28,7 @@ services.PetService = require(servicesFolder.PetService)
 services.SeasonPassService = require(servicesFolder.SeasonPassService)
 services.StyleService = require(servicesFolder.StyleService)
 services.MergeService = require(servicesFolder.MergeService)
+services.AchievementService = require(servicesFolder.AchievementService)
 services.GoldenSnackService = require(servicesFolder.GoldenSnackService)
 services.DebugService = require(servicesFolder.DebugService)
 
@@ -45,6 +46,7 @@ services.PetService.Init(services)
 services.SeasonPassService.Init(services) -- nach PetService (zahlt Eier als Belohnung aus)
 services.StyleService.Init(services)
 services.MergeService.Init(services)
+services.AchievementService.Init(services) -- wrappt BaseService-Aufrufe, daher nach BaseService
 services.GoldenSnackService.Init(services)
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
 

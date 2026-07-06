@@ -14,7 +14,8 @@ local EVENTS = {
 	"Notify", -- Server -> ein Client: kleine Toast-Nachricht
 	"Fling", -- Server -> ein Client: eigene Velocity setzen (Client besitzt die Charakter-Physik!)
 	"Sfx", -- Server -> alle Clients: Sound abspielen (name, position?)
-	"OpenShop", -- Server -> ein Client: Shop-UI öffnen (shopId: "Upgrade"|"Pets"|"Style"|"Merge")
+	"OpenShop", -- Server -> ein Client: Shop-UI öffnen (shopId: "Upgrade"|"Pets"|"Style"|"Merge"|"Housing")
+	"AchievementUnlocked", -- Server -> ein Client: Achievement-Popup (name, desc)
 }
 
 local FUNCTIONS = {
@@ -31,6 +32,7 @@ local FUNCTIONS = {
 	"GetVault", -- Client -> Server: eigenen Tresor-Inhalt abfragen (Liste von Snack-Namen)
 	"DoMerge", -- Client -> Server: Merge versuchen (snackName, count), gibt {ok, success?, msg} zurück
 	"DebugCommand", -- Client -> Server: Debug-Menü ("list" oder Command-Id) – nur Whitelist/Studio!
+	"GetAchievements", -- Client -> Server: eigene freigeschaltete Achievement-Ids abfragen
 }
 
 local Remotes = {}

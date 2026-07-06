@@ -99,6 +99,35 @@ local Config = {
 		SpawnAreaZ = 150, -- Spawn-Bereich: |z| < Wert
 	},
 
+	-- ══ Achievements ══
+	-- Meilensteine, die der AchievementService serverseitig trackt und einmalig
+	-- vergibt (profile.Achievements). Stat-Quellen:
+	--   Rebirths / TotalYeets / BaseLevel = direkt aus dem Profil
+	--   LegendaryPet = 1, sobald ein Legendary/Mythic-Pet im Besitz ist
+	--   Banked / Cracks / Golden = kumulative Zähler (profile.AchStats)
+	--
+	-- ⚠️ BadgeId = 0 heißt PLATZHALTER! Sobald auf der Creator-Seite
+	-- (create.roblox.com -> Badges) echte Badges angelegt sind, hier die
+	-- jeweiligen Ids eintragen – dann vergibt BadgeService:AwardBadge sie
+	-- automatisch zusätzlich zum In-Game-Popup. Ohne Id gibt's nur das Popup.
+	Achievements = {
+		{ Id = "ErsterYeet", Name = "🏈 Baby-YEET", Desc = "Deinen allerersten Snack geyeetet!", Stat = "TotalYeets", Value = 1, BadgeId = 0 },
+		{ Id = "YeetMaschine", Name = "💪 YEET-Maschine", Desc = "250 Snacks geyeetet!", Stat = "TotalYeets", Value = 250, BadgeId = 0 },
+		{ Id = "YeetGott", Name = "⚡ YEET-GOTT", Desc = "2000 Snacks geyeetet – deine Arme sind jetzt Legenden.", Stat = "TotalYeets", Value = 2000, BadgeId = 0, Announce = true },
+		{ Id = "ErsterSnack", Name = "🍫 Erster Schatz", Desc = "Deinen ersten Snack im Tresor eingelagert!", Stat = "Banked", Value = 1, BadgeId = 0 },
+		{ Id = "SnackSammler", Name = "🏦 Snack-Sammler", Desc = "100 Snacks eingelagert!", Stat = "Banked", Value = 100, BadgeId = 0 },
+		{ Id = "SnackBaron", Name = "👑 Snack-Baron", Desc = "1000 Snacks eingelagert – der Tresor ächzt!", Stat = "Banked", Value = 1000, BadgeId = 0, Announce = true },
+		{ Id = "ErsterRebirth", Name = "🌟 Sugar Rush!", Desc = "Deinen ersten Rebirth geschafft!", Stat = "Rebirths", Value = 1, BadgeId = 0 },
+		{ Id = "ZuckerJunkie", Name = "🍭 Zucker-Junkie", Desc = "5 Rebirths – du bist offiziell süchtig.", Stat = "Rebirths", Value = 5, BadgeId = 0, Announce = true },
+		{ Id = "Tresorknacker", Name = "😈 Tresorknacker", Desc = "Deinen ersten fremden Tresor geknackt!", Stat = "Cracks", Value = 1, BadgeId = 0 },
+		{ Id = "Meisterdieb", Name = "🥷 Meisterdieb", Desc = "25 Tresore geknackt – niemand ist sicher!", Stat = "Cracks", Value = 25, BadgeId = 0, Announce = true },
+		{ Id = "LegendenFang", Name = "🐉 Legenden-Fang", Desc = "Dein erstes Legendary- oder Mythic-Pet gezogen!", Stat = "LegendaryPet", Value = 1, BadgeId = 0 },
+		{ Id = "Goldjaeger", Name = "🌟 Goldjäger", Desc = "Deinen ersten Goldenen Snack geschnappt!", Stat = "Golden", Value = 1, BadgeId = 0 },
+		{ Id = "GoldenerBlitz", Name = "⚡ Goldener Blitz", Desc = "10 Goldene Snacks geschnappt – zu schnell für alle!", Stat = "Golden", Value = 10, BadgeId = 0, Announce = true },
+		{ Id = "Imperator", Name = "🏰 Imperator", Desc = "Das Snack-Imperium (Basis-Level 5) errichtet!", Stat = "BaseLevel", Value = 5, BadgeId = 0, Announce = true },
+	},
+	AchievementCheckInterval = 10, -- Sekunden zwischen zwei Poll-Checks der Profil-Stats
+
 	-- ══ Daten ══
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",
