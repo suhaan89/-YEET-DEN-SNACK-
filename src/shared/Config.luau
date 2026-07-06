@@ -91,6 +91,17 @@ local Config = {
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",
 
+	-- ══ Goldener Snack (Zufalls-Minievent) ══
+	-- Spawnt unabhängig vom Truck an einer zufälligen Stelle der begehbaren Map.
+	-- Wer ihn ZUERST berührt/schnappt, kriegt den Cash-Bonus (Server vergibt genau 1x).
+	GoldenSnackFirstDelay = 75, -- Sekunden nach Serverstart bis zum ersten Golden-Spawn
+	GoldenSnackIntervalMin = 120, -- Abstand zwischen zwei Spawns wird zufällig ...
+	GoldenSnackIntervalMax = 240, -- ... aus [Min, Max] gewürfelt (Sekunden)
+	GoldenSnackLifetime = 25, -- Sekunden sichtbar, dann verschwindet er wieder
+	GoldenSnackReward = 750, -- Basis-Cash-Bonus (skaliert mit dem Rebirth-Multiplikator)
+	-- Spawn-Rechteck: deckt Plaza + Straße + Wiese ab, spart Basen (z=±120) und Shops (z=±80) aus
+	GoldenSnackArea = { MinX = -200, MaxX = 200, MinZ = -60, MaxZ = 60 },
+
 	-- ══ Pet-Shop ══
 	-- Pets sind schwebende Begleiter, die passiv Cash generieren (skaliert mit Rebirth-Multiplikator).
 	-- Nur EIN Pet gleichzeitig ausgerüstet.
@@ -238,6 +249,7 @@ local Config = {
 			MergeSuccess = 30, -- Merge geglückt
 			Rebirth = 400, -- Sugar Rush
 			EggOpen = 15, -- Ei im Pet-Shop geöffnet
+			GoldenSnack = 25, -- Goldenen Snack geschnappt (Zufalls-Minievent)
 		},
 
 		-- Belohnungen pro Stufe. Typen:

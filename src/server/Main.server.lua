@@ -28,6 +28,7 @@ services.PetService = require(servicesFolder.PetService)
 services.SeasonPassService = require(servicesFolder.SeasonPassService)
 services.StyleService = require(servicesFolder.StyleService)
 services.MergeService = require(servicesFolder.MergeService)
+services.GoldenSnackService = require(servicesFolder.GoldenSnackService)
 services.DebugService = require(servicesFolder.DebugService)
 
 -- Reihenfolge ist wichtig: Daten -> Spieler -> Map -> Gameplay
@@ -44,6 +45,7 @@ services.PetService.Init(services)
 services.SeasonPassService.Init(services) -- nach PetService (zahlt Eier als Belohnung aus)
 services.StyleService.Init(services)
 services.MergeService.Init(services)
+services.GoldenSnackService.Init(services) -- nach SeasonPassService (vergibt XP)
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
 
 print("🍫 [YEET DEN SNACK] Server bereit – der Truck kommt gleich!")
