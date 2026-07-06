@@ -108,6 +108,16 @@ local Config = {
 	FriendBonusPercent = 0.1, -- +10% solange mindestens ein Freund online ist
 	FriendRecheckInterval = 60, -- Sekunden: fehlgeschlagene Freundes-Checks erneut versuchen
 
+	-- ══ Referral/Einladungen ══
+	-- Jeder Spieler hat einen festen Code (Prefix + UserId). Löst ein NEUER
+	-- Spieler (vor seinem ersten Rebirth) den Code ein, wird er dauerhaft mit
+	-- dem Einlader verknüpft. Schafft der Eingeladene Rebirth 1, bekommt der
+	-- EINLADER die Belohnung (auch wenn er gerade offline ist -> PendingRewards).
+	ReferralDataStore = "YeetDenSnack_Referrals_v1",
+	ReferralCodePrefix = "SNACK-", -- eigener Code = "SNACK-<UserId>"
+	ReferralRewardCash = 10000, -- Cash für den Einlader pro geschafftem Meilenstein
+	ReferralRewardEgg = "Golden", -- + ein Gratis-Ei (Id aus Config.Eggs)
+
 	-- ══ Achievements/Badges ══
 	-- Meilensteine, serverseitig getrackt (eigener DataStore, AchievementService).
 	-- Stat = welcher Zähler, Goal = Ziel-Wert für die Freischaltung.

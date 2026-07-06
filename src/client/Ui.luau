@@ -1657,6 +1657,143 @@ local function buildAchievements()
 	end)
 end
 
+-- ══════════ Referral/Einladungen ══════════
+-- Zeigt den eigenen Code + Erfolgs-Zähler und lässt NEUE Spieler einen
+-- fremden Code einlösen. Alles Weitere validiert der ReferralService.
+
+local function buildReferral()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "ReferralToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 168) -- unter Hilfe/Pass/Achievements
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(80, 180, 200)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "👥"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("👥 FREUNDE EINLADEN", Vector2.new(440, 330), Color3.fromRGB(120, 220, 240))
+
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 44),
+		Size = UDim2.new(1, -32, 0, 40),
+		Text = ("Lade Freunde ein! Schafft dein Freund Rebirth 1,\nkriegst DU %s💰 + ein Gratis-Gold-Ei!"):format(
+			formatNumber(Config.ReferralRewardCash)
+		),
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 15,
+		TextWrapped = true,
+	})
+
+	-- Eigener Code (groß, zum Abtippen/Weitersagen)
+	local codeBox = Instance.new("TextBox")
+	codeBox.Position = UDim2.new(0, 16, 0, 94)
+	codeBox.Size = UDim2.new(1, -32, 0, 44)
+	codeBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	codeBox.Font = FONT
+	codeBox.TextScaled = true
+	codeBox.TextColor3 = Color3.fromRGB(255, 215, 0)
+	codeBox.Text = "…"
+	codeBox.TextEditable = false -- nur zum Markieren/Kopieren, nicht editierbar
+	codeBox.ClearTextOnFocus = false
+	roundify(codeBox, 10)
+	codeBox.Parent = frame
+
+	local statsLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 144),
+		Size = UDim2.new(1, -32, 0, 24),
+		Text = "",
+		TextColor3 = Color3.fromRGB(140, 230, 160),
+	})
+
+	-- Einlöse-Bereich (nur sichtbar, solange man selbst noch einlösen darf)
+	local redeemBox = Instance.new("TextBox")
+	redeemBox.Position = UDim2.new(0, 16, 0, 186)
+	redeemBox.Size = UDim2.new(1, -152, 0, 40)
+	redeemBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	redeemBox.Font = FONT
+	redeemBox.TextSize = 18
+	redeemBox.TextColor3 = Color3.new(1, 1, 1)
+	redeemBox.PlaceholderText = "Code vom Freund, z.B. " .. Config.ReferralCodePrefix .. "12345"
+	redeemBox.Text = ""
+	redeemBox.ClearTextOnFocus = false
+	roundify(redeemBox, 10)
+	redeemBox.Parent = frame
+
+	local redeemButton = Instance.new("TextButton")
+	redeemButton.AnchorPoint = Vector2.new(1, 0)
+	redeemButton.Position = UDim2.new(1, -16, 0, 186)
+	redeemButton.Size = UDim2.fromOffset(112, 40)
+	redeemButton.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+	redeemButton.Font = FONT
+	redeemButton.TextScaled = true
+	redeemButton.Text = "EINLÖSEN"
+	redeemButton.TextColor3 = Color3.new(1, 1, 1)
+	roundify(redeemButton, 10)
+	redeemButton.Parent = frame
+
+	local redeemHint = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 232),
+		Size = UDim2.new(1, -32, 0, 60),
+		Text = "",
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 14,
+		TextWrapped = true,
+	})
+
+	local function refresh()
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return (Remotes.Get("GetReferralInfo") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(info) ~= "table" then
+				return
+			end
+			codeBox.Text = info.Code or "?"
+			statsLabel.Text = ("🤝 Erfolgreich eingeladen: %d"):format(info.SuccessCount or 0)
+			local canRedeem = info.CanRedeem == true
+			redeemBox.Visible = canRedeem
+			redeemButton.Visible = canRedeem
+			if canRedeem then
+				redeemHint.Text = "Hat DICH jemand eingeladen? Löse seinen Code ein (geht nur vor deinem ersten Rebirth)!"
+			elseif (info.InvitedBy or 0) > 0 then
+				redeemHint.Text = "✅ Du bist schon mit deinem Einlader verknüpft – schaff Rebirth 1 für seine Prämie!"
+			else
+				redeemHint.Text = "Einlösen geht nur für neue Spieler (vor dem ersten Rebirth)."
+			end
+		end)
+	end
+
+	redeemButton.Activated:Connect(function()
+		local code = redeemBox.Text
+		if code:gsub("%s", "") == "" then
+			Ui.Toast("❌ Erst einen Code eintippen!")
+			return
+		end
+		task.spawn(function()
+			local ok, result = pcall(function()
+				return (Remotes.Get("RedeemReferral") :: RemoteFunction):InvokeServer(code)
+			end)
+			if ok and typeof(result) == "table" then
+				Ui.Toast((result.ok and "🤝 " or "❌ ") .. result.msg)
+			end
+			refresh()
+		end)
+	end)
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -1796,6 +1933,7 @@ function Ui.Build()
 	buildChargeBar()
 	buildSeasonPass()
 	buildAchievements()
+	buildReferral()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert
