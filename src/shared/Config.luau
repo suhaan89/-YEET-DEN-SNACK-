@@ -102,6 +102,12 @@ local Config = {
 	-- Spawn-Rechteck: deckt Plaza + Straße + Wiese ab, spart Basen (z=±120) und Shops (z=±80) aus
 	GoldenSnackArea = { MinX = -200, MaxX = 200, MinZ = -60, MaxZ = 60 },
 
+	-- ══ Freunde-Bonus ══
+	-- Spielt ein Roblox-Freund gleichzeitig im selben Server, bekommen BEIDE
+	-- einen passiven Einkommens-Boost aufs rohe Tresor-Einkommen (FriendService).
+	FriendBonusPercent = 0.1, -- +10% solange mindestens ein Freund online ist
+	FriendRecheckInterval = 60, -- Sekunden: fehlgeschlagene Freundes-Checks erneut versuchen
+
 	-- ══ Achievements/Badges ══
 	-- Meilensteine, serverseitig getrackt (eigener DataStore, AchievementService).
 	-- Stat = welcher Zähler, Goal = Ziel-Wert für die Freischaltung.

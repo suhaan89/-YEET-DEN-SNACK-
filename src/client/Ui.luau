@@ -1126,6 +1126,41 @@ local function buildSupremeBar()
 	refresh()
 end
 
+-- ══════════ Freundes-Bonus-Anzeige ══════════
+-- Kleines Badge unter der Supreme-Anzeige, solange der Server-Bonus aktiv ist
+-- (Datenquelle: "FriendsOnline"-Attribut, setzt der FriendService).
+
+local function buildFriendBonus()
+	local frame = Instance.new("Frame")
+	frame.Name = "FriendBonus"
+	frame.Position = UDim2.new(0, 12, 0, 120) -- unter SupremeProgress (y=66, Höhe 48)
+	frame.Size = UDim2.fromOffset(190, 30)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 55, 40)
+	frame.BackgroundTransparency = 0.25
+	frame.Visible = false
+	roundify(frame, 10)
+	frame.Parent = gui
+
+	local label = makeLabel(frame, {
+		Size = UDim2.new(1, -12, 1, -6),
+		Position = UDim2.fromOffset(6, 3),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(140, 230, 160),
+	})
+
+	local function refresh()
+		local friends = player:GetAttribute("FriendsOnline")
+		local active = typeof(friends) == "number" and friends > 0
+		frame.Visible = active
+		if active then
+			label.Text = ("👫 Freundes-Bonus: +%d%%"):format(Config.FriendBonusPercent * 100)
+		end
+	end
+	player:GetAttributeChangedSignal("FriendsOnline"):Connect(refresh)
+	refresh()
+end
+
 -- ══════════ Debug-Menü (nur Entwickler) ══════════
 -- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
 -- Die Buttons kommen komplett vom Server (DebugCommand "list") – neue Commands
@@ -1757,6 +1792,7 @@ function Ui.Build()
 	})
 	buildMergeUi()
 	buildSupremeBar()
+	buildFriendBonus()
 	buildChargeBar()
 	buildSeasonPass()
 	buildAchievements()
