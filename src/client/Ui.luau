@@ -1163,8 +1163,11 @@ end
 
 -- ══════════ Debug-Menü (nur Entwickler) ══════════
 -- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
--- Die Buttons kommen komplett vom Server (DebugCommand "list") – neue Commands
--- im DebugService tauchen hier also automatisch auf, ohne UI-Änderung.
+-- Tabs (Spieler/Events/Diagnose/Server), Suchfeld, Ziel-Auswahl und F4-Toggle.
+-- Die Command-Buttons kommen komplett vom Server (DebugCommand "list") – neue
+-- Commands im DebugService tauchen automatisch im passenden Tab auf, ohne
+-- UI-Änderung. Die Diagnose-Tools (Zonen-Anzeige, State-Inspector, Log-Panel,
+-- Performance-HUD) laufen client-lokal und LESEN den Spielzustand nur aus.
 
 local debugBuilt = false
 
@@ -1174,68 +1177,578 @@ local function buildDebugMenu()
 	end
 	debugBuilt = true
 
+	local UserInputService = game:GetService("UserInputService")
+	local RunService = game:GetService("RunService")
 	local debugRemote = Remotes.Get("DebugCommand") :: RemoteFunction
 
+	-- Sichere Invoke-Hülle (Server prüft die Whitelist bei jedem Aufruf selbst)
+	local function invoke(action: string, payload: any?): any
+		local ok, result = pcall(function()
+			return debugRemote:InvokeServer(action, payload)
+		end)
+		return if ok then result else nil
+	end
+
+	-- ── Ziel-Auswahl: nil = ich selbst ──
+	local targetUserId: number? = nil
+
+	local function targetPayload(extra: any?): any
+		local payload = extra or {}
+		payload.Target = targetUserId
+		return payload
+	end
+
+	-- ── Hauptfenster ──
+	local panel = makeWindow("🐞 DEBUG-MENÜ", Vector2.new(620, 540), Color3.fromRGB(255, 120, 120))
+
+	local searchBox = Instance.new("TextBox")
+	searchBox.Position = UDim2.fromOffset(16, 44)
+	searchBox.Size = UDim2.new(0.5, -24, 0, 32)
+	searchBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	searchBox.Font = FONT
+	searchBox.TextSize = 16
+	searchBox.TextColor3 = Color3.new(1, 1, 1)
+	searchBox.PlaceholderText = "🔍 Aktion suchen..."
+	searchBox.Text = ""
+	searchBox.ClearTextOnFocus = false
+	roundify(searchBox, 8)
+	searchBox.Parent = panel
+
+	local targetButton = Instance.new("TextButton")
+	targetButton.AnchorPoint = Vector2.new(1, 0)
+	targetButton.Position = UDim2.new(1, -16, 0, 44)
+	targetButton.Size = UDim2.new(0.5, -24, 0, 32)
+	targetButton.BackgroundColor3 = Color3.fromRGB(70, 60, 90)
+	targetButton.Font = FONT
+	targetButton.TextScaled = true
+	targetButton.TextColor3 = Color3.fromRGB(255, 220, 120)
+	targetButton.Text = "🎯 Ziel: DU"
+	roundify(targetButton, 8)
+	targetButton.Parent = panel
+
+	local function refreshTargetButton()
+		local target = targetUserId and Players:GetPlayerByUserId(targetUserId)
+		if targetUserId and not target then
+			targetUserId = nil -- Ziel hat den Server verlassen
+		end
+		targetButton.Text = if target then ("🎯 Ziel: %s"):format(target.Name) else "🎯 Ziel: DU (klick = wechseln)"
+	end
+
+	-- Klick = zum nächsten Spieler im Server durchschalten (Kategorie 4.1)
+	targetButton.Activated:Connect(function()
+		local players = Players:GetPlayers()
+		local currentId = targetUserId or player.UserId
+		local index = 1
+		for i, p in players do
+			if p.UserId == currentId then
+				index = i
+				break
+			end
+		end
+		local nextPlayer = players[(index % #players) + 1]
+		targetUserId = if nextPlayer == player then nil else nextPlayer.UserId
+		refreshTargetButton()
+	end)
+
+	-- ── Tabs ──
+	local TABS = { "Spieler", "Events", "Diagnose", "Server" }
+	local activeTab = "Spieler"
+	local tabButtons: { [string]: TextButton } = {}
+	local rebuildRows: () -> () = function() end
+
+	local tabRow = Instance.new("Frame")
+	tabRow.Position = UDim2.fromOffset(16, 84)
+	tabRow.Size = UDim2.new(1, -32, 0, 34)
+	tabRow.BackgroundTransparency = 1
+	tabRow.Parent = panel
+	local tabLayout = Instance.new("UIListLayout")
+	tabLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabLayout.Padding = UDim.new(0, 6)
+	tabLayout.Parent = tabRow
+
+	for _, name in TABS do
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(0.25, -6, 1, 0)
+		button.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		button.Font = FONT
+		button.TextScaled = true
+		button.Text = name
+		button.TextColor3 = Color3.new(1, 1, 1)
+		roundify(button, 8)
+		button.Parent = tabRow
+		tabButtons[name] = button
+		button.Activated:Connect(function()
+			activeTab = name
+			rebuildRows()
+		end)
+	end
+
+	-- ── Command-Liste ──
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 126)
+	list.Size = UDim2.new(1, -24, 1, -138)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = panel
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.Padding = UDim.new(0, 6)
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Parent = list
+
+	local commandsCache: { any } = {}
+
+	-- ── Bestätigungs-Dialog für Danger-Commands ──
+	local function confirmThen(question: string, callback: () -> ())
+		local overlay = Instance.new("TextButton")
+		overlay.Size = UDim2.fromScale(1, 1)
+		overlay.BackgroundColor3 = Color3.new(0, 0, 0)
+		overlay.BackgroundTransparency = 0.5
+		overlay.Text = ""
+		overlay.AutoButtonColor = false
+		overlay.ZIndex = 30
+		overlay.Parent = gui
+
+		local box = Instance.new("Frame")
+		box.AnchorPoint = Vector2.new(0.5, 0.5)
+		box.Position = UDim2.fromScale(0.5, 0.5)
+		box.Size = UDim2.fromOffset(400, 160)
+		box.BackgroundColor3 = Color3.fromRGB(70, 38, 44)
+		box.ZIndex = 31
+		roundify(box, 14)
+		box.Parent = overlay
+		makeLabel(box, {
+			Position = UDim2.fromOffset(14, 10),
+			Size = UDim2.new(1, -28, 0, 84),
+			Text = ("⚠️ Wirklich ausführen?\n%s\nDas kann Fortschritt zerstören!"):format(question),
+			TextWrapped = true,
+			TextScaled = false,
+			TextSize = 16,
+			ZIndex = 32,
+		})
+		local function makeChoice(text: string, color: Color3, x: number, onClick: () -> ())
+			local button = Instance.new("TextButton")
+			button.Position = UDim2.new(x, 14, 1, -54)
+			button.Size = UDim2.new(0.5, -28, 0, 42)
+			button.BackgroundColor3 = color
+			button.Font = FONT
+			button.TextScaled = true
+			button.Text = text
+			button.TextColor3 = Color3.new(1, 1, 1)
+			button.ZIndex = 32
+			roundify(button, 10)
+			button.Parent = box
+			button.Activated:Connect(onClick)
+		end
+		makeChoice("✅ JA, ausführen", Color3.fromRGB(180, 60, 60), 0, function()
+			overlay:Destroy()
+			callback()
+		end)
+		makeChoice("ABBRECHEN", Color3.fromRGB(70, 70, 90), 0.5, function()
+			overlay:Destroy()
+		end)
+		overlay.Activated:Connect(function()
+			overlay:Destroy()
+		end)
+	end
+
+	-- ── Diagnose-Tool 1: State-Inspector (links, live-aktualisiert) ──
+	local inspectorFrame = makeWindow("📋 STATE-INSPECTOR", Vector2.new(380, 470), Color3.fromRGB(150, 220, 255))
+	inspectorFrame.AnchorPoint = Vector2.new(0, 0.5)
+	inspectorFrame.Position = UDim2.new(0, 12, 0.5, 0)
+	local inspectorScroll = Instance.new("ScrollingFrame")
+	inspectorScroll.Position = UDim2.new(0, 12, 0, 48)
+	inspectorScroll.Size = UDim2.new(1, -24, 1, -60)
+	inspectorScroll.BackgroundTransparency = 1
+	inspectorScroll.BorderSizePixel = 0
+	inspectorScroll.ScrollBarThickness = 6
+	inspectorScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	inspectorScroll.CanvasSize = UDim2.new()
+	inspectorScroll.Parent = inspectorFrame
+	local inspectorText = Instance.new("TextLabel")
+	inspectorText.Size = UDim2.new(1, -8, 0, 0)
+	inspectorText.AutomaticSize = Enum.AutomaticSize.Y
+	inspectorText.BackgroundTransparency = 1
+	inspectorText.Font = Enum.Font.Code
+	inspectorText.TextSize = 14
+	inspectorText.TextColor3 = Color3.fromRGB(200, 230, 255)
+	inspectorText.TextXAlignment = Enum.TextXAlignment.Left
+	inspectorText.TextYAlignment = Enum.TextYAlignment.Top
+	inspectorText.TextWrapped = true
+	inspectorText.Text = ""
+	inspectorText.Parent = inspectorScroll
+
+	task.spawn(function()
+		while true do
+			task.wait(0.7)
+			if inspectorFrame.Visible then
+				local result = invoke("inspect", targetPayload())
+				if typeof(result) == "table" and typeof(result.Lines) == "table" then
+					inspectorText.Text = table.concat(result.Lines, "\n")
+				end
+			end
+		end
+	end)
+
+	-- ── Diagnose-Tool 2: Zonen-Visualisierung (client-lokal, rein lesend) ──
+	local zoneFolder: Folder? = nil
+
+	local function addOverlayBox(folder: Folder, cf: CFrame, size: Vector3, color: Color3, labelText: string?): Part
+		local box = Instance.new("Part")
+		box.Anchored = true
+		box.CanCollide = false
+		box.CanQuery = false
+		box.CanTouch = false
+		box.Transparency = 0.72
+		box.Color = color
+		box.Material = Enum.Material.SmoothPlastic
+		box.Size = size
+		box.CFrame = cf
+		if labelText then
+			local billboard = Instance.new("BillboardGui")
+			billboard.Size = UDim2.fromOffset(180, 22)
+			billboard.StudsOffsetWorldSpace = Vector3.new(0, size.Y / 2 + 1, 0)
+			billboard.AlwaysOnTop = true
+			billboard.MaxDistance = 200
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundTransparency = 1
+			label.Text = labelText
+			label.TextScaled = true
+			label.Font = FONT
+			label.TextColor3 = color
+			label.TextStrokeTransparency = 0.2
+			label.Parent = billboard
+			billboard.Parent = box
+		end
+		box.Parent = folder
+		return box
+	end
+
+	local function toggleZoneOverlay()
+		if zoneFolder then
+			zoneFolder:Destroy()
+			zoneFolder = nil
+			Ui.Toast("🗺️ Zonen-Anzeige AUS.")
+			return
+		end
+		local folder = Instance.new("Folder")
+		folder.Name = "DebugZoneOverlay"
+		zoneFolder = folder
+
+		-- Basis-Fangzonen (grün)
+		local map = workspace:FindFirstChild("Map")
+		if map then
+			for _, inst in map:GetDescendants() do
+				if inst.Name == "VaultZone" and inst:IsA("BasePart") then
+					local parentName = inst.Parent and inst.Parent.Name or "?"
+					addOverlayBox(folder, inst.CFrame, inst.Size, Color3.fromRGB(80, 220, 120), "VaultZone " .. parentName)
+				end
+			end
+		end
+
+		-- Alle ProximityPrompts: Part orange umranden + Reichweite als Kugel
+		-- (Snacks/Pets ausgenommen – die bewegen sich; das hier ist ein Snapshot)
+		local snacksFolder = workspace:FindFirstChild("Snacks")
+		local petsFolder = workspace:FindFirstChild("Pets")
+		for _, inst in workspace:GetDescendants() do
+			if not inst:IsA("ProximityPrompt") then
+				continue
+			end
+			local parent = inst.Parent
+			if not (parent and parent:IsA("BasePart")) then
+				continue
+			end
+			if snacksFolder and parent:IsDescendantOf(snacksFolder) then
+				continue
+			end
+			if petsFolder and parent:IsDescendantOf(petsFolder) then
+				continue
+			end
+			if parent:IsDescendantOf(folder) then
+				continue
+			end
+			local title = if inst.ObjectText ~= "" then inst.ObjectText else parent.Name
+			addOverlayBox(folder, parent.CFrame, parent.Size + Vector3.new(0.6, 0.6, 0.6), Color3.fromRGB(255, 170, 60), "📍 " .. title)
+			local range = addOverlayBox(folder, parent.CFrame, Vector3.one * inst.MaxActivationDistance * 2, Color3.fromRGB(255, 170, 60))
+			range.Transparency = 0.93
+			range.Shape = Enum.PartType.Ball
+		end
+		folder.Parent = workspace
+		Ui.Toast("🗺️ Zonen-Anzeige AN (Snapshot – nach Map-Änderungen neu togglen).")
+	end
+
+	-- ── Diagnose-Tool 3: Log- & Remote-Panel (rechts) ──
+	local logFrame = makeWindow("🧾 LOGS & REMOTES", Vector2.new(470, 430), Color3.fromRGB(255, 180, 120))
+	logFrame.AnchorPoint = Vector2.new(1, 0.5)
+	logFrame.Position = UDim2.new(1, -12, 0.5, 0)
+	local logScroll = Instance.new("ScrollingFrame")
+	logScroll.Position = UDim2.new(0, 12, 0, 48)
+	logScroll.Size = UDim2.new(1, -24, 1, -60)
+	logScroll.BackgroundTransparency = 1
+	logScroll.BorderSizePixel = 0
+	logScroll.ScrollBarThickness = 6
+	logScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	logScroll.CanvasSize = UDim2.new()
+	logScroll.Parent = logFrame
+	local logText = Instance.new("TextLabel")
+	logText.Size = UDim2.new(1, -8, 0, 0)
+	logText.AutomaticSize = Enum.AutomaticSize.Y
+	logText.BackgroundTransparency = 1
+	logText.Font = Enum.Font.Code
+	logText.TextSize = 13
+	logText.TextColor3 = Color3.fromRGB(255, 220, 190)
+	logText.TextXAlignment = Enum.TextXAlignment.Left
+	logText.TextYAlignment = Enum.TextYAlignment.Top
+	logText.TextWrapped = true
+	logText.Text = ""
+	logText.Parent = logScroll
+
+	-- Server->Client-Events lokal mitschreiben (Sfx ausgenommen – zu laut)
+	local clientRemoteLog: { string } = {}
+	for _, remote in ReplicatedStorage:WaitForChild("Remotes"):GetChildren() do
+		if remote:IsA("RemoteEvent") and remote.Name ~= "Sfx" then
+			remote.OnClientEvent:Connect(function(...)
+				local args = table.pack(...)
+				local parts = {}
+				for i = 1, math.min(args.n, 3) do
+					table.insert(parts, tostring(args[i]))
+				end
+				table.insert(clientRemoteLog, ("[%s] %s: %s"):format(os.date("%H:%M:%S"), remote.Name, table.concat(parts, ", ")))
+				if #clientRemoteLog > 10 then
+					table.remove(clientRemoteLog, 1)
+				end
+			end)
+		end
+	end
+
+	task.spawn(function()
+		while true do
+			task.wait(2)
+			if not logFrame.Visible then
+				continue
+			end
+			local data = invoke("logs")
+			if typeof(data) ~= "table" then
+				continue
+			end
+			local lines = { "── SERVER-WARNUNGEN/-FEHLER (letzte 20) ──" }
+			if typeof(data.Logs) == "table" then
+				if #data.Logs == 0 then
+					table.insert(lines, "(keine – gut so!)")
+				end
+				for _, entry in data.Logs do
+					table.insert(lines, ("[%s %s] %s"):format(entry.Time, entry.Type, entry.Text))
+				end
+			end
+			table.insert(lines, "")
+			table.insert(lines, "── REMOTES Client→Server (letzte 15) ──")
+			if typeof(data.Remotes) == "table" then
+				for _, entry in data.Remotes do
+					table.insert(lines, ("[%s] %s ← %s (%s)"):format(entry.Time, entry.Name, entry.From, entry.Args))
+				end
+			end
+			table.insert(lines, "")
+			table.insert(lines, "── REMOTES Server→Client (lokal, ohne Sfx) ──")
+			for _, line in clientRemoteLog do
+				table.insert(lines, line)
+			end
+			logText.Text = table.concat(lines, "\n")
+		end
+	end)
+
+	-- ── Diagnose-Tool 4: Performance-HUD (FPS/Ping/Server-RAM) ──
+	local perfFrame = Instance.new("Frame")
+	perfFrame.Name = "PerfHud"
+	perfFrame.AnchorPoint = Vector2.new(1, 1)
+	perfFrame.Position = UDim2.new(1, -12, 1, -66)
+	perfFrame.Size = UDim2.fromOffset(190, 74)
+	perfFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+	perfFrame.BackgroundTransparency = 0.25
+	perfFrame.Visible = false
+	roundify(perfFrame, 10)
+	perfFrame.Parent = gui
+	local perfLabel = makeLabel(perfFrame, {
+		Position = UDim2.fromOffset(8, 4),
+		Size = UDim2.new(1, -16, 1, -8),
+		Text = "📈 ...",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextScaled = false,
+		TextSize = 14,
+	})
+
+	local serverMemoryMb = 0
+	task.spawn(function()
+		while true do
+			task.wait(3)
+			if perfFrame.Visible then
+				local data = invoke("logs")
+				if typeof(data) == "table" and typeof(data.MemoryMb) == "number" then
+					serverMemoryMb = data.MemoryMb
+				end
+			end
+		end
+	end)
+	local frameCount = 0
+	local fpsWindowStart = os.clock()
+	RunService.RenderStepped:Connect(function()
+		if not perfFrame.Visible then
+			return
+		end
+		frameCount += 1
+		local now = os.clock()
+		if now - fpsWindowStart >= 1 then
+			local fps = frameCount / (now - fpsWindowStart)
+			frameCount = 0
+			fpsWindowStart = now
+			local ping = math.floor(player:GetNetworkPing() * 1000)
+			perfLabel.Text = ("📈 FPS: %d\n📡 Ping: %d ms\n💾 Server-RAM: %d MB"):format(fps, ping, serverMemoryMb)
+		end
+	end)
+
+	-- Lokale Diagnose-Zeilen (erscheinen NUR im Diagnose-Tab)
+	local localTools = {
+		{ Label = "📋 State-Inspector ein/aus (zeigt das ZIEL)", Action = function()
+			inspectorFrame.Visible = not inspectorFrame.Visible
+		end },
+		{ Label = "🗺️ Trigger-Zonen einblenden/ausblenden", Action = toggleZoneOverlay },
+		{ Label = "🧾 Log- & Remote-Panel ein/aus", Action = function()
+			logFrame.Visible = not logFrame.Visible
+		end },
+		{ Label = "📈 Performance-HUD ein/aus (FPS/Ping/RAM)", Action = function()
+			perfFrame.Visible = not perfFrame.Visible
+		end },
+	}
+
+	-- ── Zeilen im aktiven Tab (nach Suchtext gefiltert) ──
+	local function makeRow(order: number, labelText: string, danger: boolean, argDefault: number?, onRun: (value: number?) -> ())
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 40)
+		row.BackgroundTransparency = 1
+		row.LayoutOrder = order
+		row.Parent = list
+
+		local argBox: TextBox? = nil
+		if argDefault ~= nil then
+			local box = Instance.new("TextBox")
+			box.AnchorPoint = Vector2.new(1, 0.5)
+			box.Position = UDim2.new(1, 0, 0.5, 0)
+			box.Size = UDim2.fromOffset(96, 36)
+			box.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+			box.Font = FONT
+			box.TextSize = 16
+			box.TextColor3 = Color3.new(1, 1, 1)
+			box.Text = tostring(argDefault)
+			box.ClearTextOnFocus = false
+			roundify(box, 8)
+			box.Parent = row
+			argBox = box
+		end
+
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, if argBox then -104 else 0, 1, 0)
+		button.BackgroundColor3 = if danger then Color3.fromRGB(150, 55, 60) else Color3.fromRGB(70, 60, 90)
+		button.Font = FONT
+		button.TextScaled = true
+		button.Text = (if danger then "⚠️ " else "") .. labelText
+		button.TextColor3 = Color3.new(1, 1, 1)
+		roundify(button, 8)
+		button.Parent = row
+		button.Activated:Connect(function()
+			onRun(if argBox then tonumber(argBox.Text) else nil)
+		end)
+	end
+
+	rebuildRows = function()
+		for _, child in list:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		for name, button in tabButtons do
+			button.BackgroundColor3 = if name == activeTab then Color3.fromRGB(180, 60, 65) else Color3.fromRGB(55, 48, 70)
+		end
+
+		local filter = searchBox.Text:lower()
+		local function matches(label: string): boolean
+			return filter == "" or label:lower():find(filter, 1, true) ~= nil
+		end
+
+		local order = 0
+		if activeTab == "Diagnose" then
+			for _, tool in localTools do
+				if matches(tool.Label) then
+					order += 1
+					makeRow(order, tool.Label, false, nil, tool.Action)
+				end
+			end
+		end
+		for _, cmd in commandsCache do
+			if cmd.Category == activeTab and matches(cmd.Label) then
+				order += 1
+				makeRow(order, cmd.Label, cmd.Danger == true, cmd.Arg and cmd.Arg.Default, function(value)
+					local function run()
+						task.spawn(function()
+							local result = invoke(cmd.Id, targetPayload({ Value = value }))
+							if typeof(result) == "table" and result.msg then
+								Ui.Toast((result.ok and "🐞 " or "❌ ") .. result.msg)
+							end
+						end)
+					end
+					if cmd.Danger then
+						confirmThen(cmd.Label, run)
+					else
+						run()
+					end
+				end)
+			end
+		end
+	end
+	searchBox:GetPropertyChangedSignal("Text"):Connect(rebuildRows)
+
+	-- Command-Liste (neu) vom Server holen – bei jedem Öffnen, damit die
+	-- dynamischen Teleport-Ziele (Basis-Besitzer!) aktuell sind
+	local function refreshCommands()
+		task.spawn(function()
+			local result = invoke("list")
+			if typeof(result) == "table" and typeof(result.Commands) == "table" then
+				commandsCache = result.Commands
+			end
+			rebuildRows()
+		end)
+	end
+
+	-- ── Toggle-Button + F4 ──
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "DebugToggle"
 	toggle.AnchorPoint = Vector2.new(0, 1)
 	toggle.Position = UDim2.new(0, 12, 1, -12)
-	toggle.Size = UDim2.fromOffset(110, 40)
+	toggle.Size = UDim2.fromOffset(130, 40)
 	toggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	toggle.Font = FONT
 	toggle.TextScaled = true
-	toggle.Text = "🐞 DEBUG"
+	toggle.Text = "🐞 DEBUG [F4]"
 	toggle.TextColor3 = Color3.new(1, 1, 1)
 	roundify(toggle, 12)
 	toggle.Parent = gui
 
-	local panel = makeWindow("🐞 DEBUG-MENÜ", Vector2.new(320, 140), Color3.fromRGB(255, 120, 120))
-
-	local list = Instance.new("Frame")
-	list.Position = UDim2.new(0, 12, 0, 48)
-	list.Size = UDim2.new(1, -24, 1, -60)
-	list.BackgroundTransparency = 1
-	list.Parent = panel
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 6)
-	layout.Parent = list
-
-	-- Buttons vom Server generieren lassen
-	task.spawn(function()
-		local ok, commands = pcall(function()
-			return debugRemote:InvokeServer("list")
-		end)
-		if not ok or typeof(commands) ~= "table" then
-			return
-		end
-		panel.Size = UDim2.fromOffset(320, 72 + #commands * 46)
-		for _, cmd in commands do
-			local button = Instance.new("TextButton")
-			button.Size = UDim2.new(1, 0, 0, 40)
-			button.BackgroundColor3 = Color3.fromRGB(70, 60, 90)
-			button.Font = FONT
-			button.TextScaled = true
-			button.Text = cmd.Label
-			button.TextColor3 = Color3.new(1, 1, 1)
-			roundify(button, 10)
-			button.Parent = list
-
-			button.Activated:Connect(function()
-				task.spawn(function()
-					local callOk, result = pcall(function()
-						return debugRemote:InvokeServer(cmd.Id)
-					end)
-					if callOk and typeof(result) == "table" then
-						Ui.Toast((result.ok and "🐞 " or "❌ ") .. result.msg)
-					end
-				end)
-			end)
-		end
-	end)
-
-	toggle.Activated:Connect(function()
+	local function togglePanel()
 		panel.Visible = not panel.Visible
+		if panel.Visible then
+			refreshTargetButton()
+			refreshCommands()
+		end
+	end
+	toggle.Activated:Connect(togglePanel)
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if not gameProcessed and input.KeyCode == Enum.KeyCode.F4 then
+			togglePanel()
+		end
 	end)
+
+	refreshCommands()
 end
 
 -- ══════════ Season-Pass ══════════

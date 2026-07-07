@@ -50,8 +50,11 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
    Yeets, Merges, Eier & Rebirths. 35 Stufen, Free-Spur für alle + Premium-Spur
    per Robux-Gamepass (bessere Belohnungen, exklusiver Zucker-Phönix auf 35).
    Season-exklusive Trails sind nicht kaufbar, nur erspielbar.
-15. 🐞 **Admin-Menü**: im Studio immer sichtbar; live automatisch für den
+15. 🐞 **Admin-Menü** ([F4]): im Studio immer sichtbar; live automatisch für den
    Spiel-Besitzer (bzw. Gruppen-Rang ≥254) + UserIds aus `Config.DebugUserIds`.
+   Tabs Spieler/Events/Diagnose/Server mit Suchfeld, Ziel-Spieler-Auswahl und
+   Bestätigungs-Dialog für zerstörerische Aktionen. Diagnose: State-Inspector,
+   Trigger-Zonen-Anzeige, Server-Log-/Remote-Panel, Performance-HUD.
 16. 🌟 **Goldener Snack**: Alle 2–4 Minuten (unabhängig vom Truck!) spawnt
    irgendwo ein goldener Snack mit Leuchtsäule. Wer ihn ZUERST berührt/[E]
    drückt, kassiert einen Cash-Bonus (×Rebirth-Multiplikator) + Pass-XP.
