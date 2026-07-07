@@ -184,6 +184,11 @@ local function runGoldenSnack()
 	end
 end
 
+-- Debug-Hook: goldenen Snack sofort spawnen (fürs Test-Menü; unabhängig vom Timer)
+function GoldenSnackService.DebugSpawnNow()
+	task.spawn(runGoldenSnack)
+end
+
 function GoldenSnackService.Init(services)
 	DataService = services.DataService
 	PlayerService = services.PlayerService

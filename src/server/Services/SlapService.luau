@@ -122,6 +122,11 @@ local function onSlap(player: Player)
 	AchievementService.Track(player, "Slaps", 1)
 end
 
+-- Debug-Hook: Slap-Cooldown eines Spielers zurücksetzen (fürs Test-Menü)
+function SlapService.DebugResetCooldown(player: Player)
+	lastSlap[player] = nil
+end
+
 function SlapService.Init(services)
 	SnackService = services.SnackService
 	DataService = services.DataService
