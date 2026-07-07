@@ -195,6 +195,15 @@ function PetService.GrantEgg(player: Player, eggId: string)
 		)
 	end
 
+	-- Achievement-Fortschritt (lose verdrahtet, wie der Season-Pass-Hook unten)
+	local achievements = servicesRef and servicesRef.AchievementService
+	if achievements then
+		achievements.Track(player, "EggsOpened", 1)
+		if def.Rarity == "Legendary" or def.Rarity == "Mythic" then
+			achievements.Track(player, "LegendaryPets", 1)
+		end
+	end
+
 	return {
 		ok = true,
 		msg = msg,

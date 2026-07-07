@@ -1,19 +1,26 @@
 --[[
 	ReferralService.luau
-	Einladungssystem: "YEET-<UserId>"-Codes, dauerhafte Verknüpfung,
-	Belohnung für den EINLADENDEN, sobald der Eingeladene Rebirth 1 schafft.
+	Einladungs-System: Jeder Spieler hat einen festen Code ("SNACK-<UserId>").
 
-	Server-autoritativ:
-	- Der Client kann nur einen Code-String schicken; validiert (existiert der
-	  User? kein Selbst-Invite? Spieler wirklich neu?) und gespeichert wird
-	  ausschließlich hier.
-	- Verknüpfung liegt im Profil des EINGELADENEN (profile.Referral.ReferredBy)
-	  – lazy angelegt, DataService bleibt unberührt.
-	- Meilenstein-Gutschrift für Offline-Einlader läuft über einen eigenen
-	  Pending-DataStore (Key "Pending_<UserId>", Wert = Anzahl unabgeholter
-	  Erfolge, atomar via UpdateAsync). Beim Join wird abgeräumt.
-	- Zusätzlich: Join über einen Einladungs-Link mit LaunchData "ref=<UserId>"
-	  löst den Code automatisch ein.
+	Ablauf:
+	1. Neuer Spieler (vor Rebirth 1) löst den Code eines Freundes ein ->
+	   dauerhafte Verknüpfung (InvitedBy) im eigenen DataStore.
+	2. Schafft der Eingeladene Rebirth 1 (Meilenstein, erkannt über den
+	   replizierten leaderstats-Wert – KEIN Eingriff in die Rebirth-Logik),
+	   bekommt der EINLADER Cash + ein Gratis-Ei.
+	3. Ist der Einlader gerade offline/in einem anderen Server, wird die
+	   Belohnung als PendingRewards vermerkt und beim nächsten Join ausgezahlt.
+
+	Server-autoritativ: Der Client schickt nur den Code-String; Verknüpfung,
+	Meilenstein-Erkennung und Auszahlung passieren ausschließlich hier.
+	ALLE DataStore-Schreibzugriffe laufen über UpdateAsync (merge-sicher,
+	weil fremde Server denselben Einlader-Datensatz anfassen können).
+
+	Datensatz pro Spieler ("Ref_<UserId>"):
+	  InvitedBy      = UserId des Einladers (0 = niemand)
+	  Completed      = eigener Meilenstein wurde schon verrechnet
+	  SuccessCount   = wie viele Eingeladene den Meilenstein geschafft haben
+	  PendingRewards = noch nicht ausgezahlte Belohnungen (Einlader offline)
 ]]
 
 local Players = game:GetService("Players")
@@ -31,174 +38,207 @@ local notifyRemote: RemoteEvent
 local announceRemote: RemoteEvent
 local sfxRemote: RemoteEvent
 
-local pendingStore = nil -- DataStore für Offline-Gutschriften (nil ohne API-Zugriff)
+local store = nil
+local records: { [Player]: any } = {} -- gecachter eigener Datensatz
 
--- Fehlende Referral-Felder im Profil anlegen (Alt-Spielstände!)
-local function ensureFields(profile)
-	if typeof(profile.Referral) ~= "table" then
-		profile.Referral = {
-			ReferredBy = 0, -- UserId des Einladenden (0 = niemand)
-			MilestoneReported = false, -- Gutschrift für meinen Einladenden schon raus?
-			Invited = 0, -- so viele meiner Eingeladenen haben den Meilenstein geschafft
-		}
+local function defaultRecord()
+	return { InvitedBy = 0, Completed = false, SuccessCount = 0, PendingRewards = 0 }
+end
+
+local function keyFor(userId: number): string
+	return "Ref_" .. userId
+end
+
+local function codeFor(userId: number): string
+	return Config.ReferralCodePrefix .. userId
+end
+
+-- Merge-sicherer Schreibzugriff; gibt (ok, neuer Datensatz) zurück
+local function updateRecord(userId: number, transform: (any) -> any): (boolean, any)
+	if not store then
+		return false, nil
 	end
-	return profile.Referral
+	local result = nil
+	local ok, err = pcall(function()
+		result = store:UpdateAsync(keyFor(userId), function(old)
+			local record = if typeof(old) == "table" then old else defaultRecord()
+			for field, value in defaultRecord() do
+				if record[field] == nil then
+					record[field] = value
+				end
+			end
+			return transform(record)
+		end)
+	end)
+	if not ok then
+		warn("[ReferralService] UpdateAsync fehlgeschlagen für", userId, err)
+		return false, nil
+	end
+	return true, result
 end
 
-function ReferralService.CodeFor(userId: number): string
-	return ("YEET-%d"):format(userId)
-end
-
--- "YEET-12345", "yeet-12345" oder nur "12345" -> UserId (oder nil)
+-- "SNACK-12345", "snack-12345" oder "12345" -> 12345 (oder nil)
 local function parseCode(code: string): number?
 	local cleaned = code:gsub("%s", ""):upper()
-	local idText = cleaned:match("^YEET%-(%d+)$") or cleaned:match("^(%d+)$")
-	return idText and tonumber(idText)
+	local prefix = Config.ReferralCodePrefix:upper()
+	if cleaned:sub(1, #prefix) == prefix then
+		cleaned = cleaned:sub(#prefix + 1)
+	end
+	local userId = tonumber(cleaned)
+	if userId and userId == math.floor(userId) and userId > 0 then
+		return userId
+	end
+	return nil
 end
 
--- ══════════ Belohnung für den Einladenden ══════════
+-- ══════════ Belohnung an den Einlader ══════════
 
--- Zahlt `count` Erfolgs-Belohnungen an einen ONLINE-Einlader aus
-local function grantInviterReward(inviter: Player, count: number)
-	local profile = DataService.Get(inviter)
-	if not profile or count <= 0 then
-		return
-	end
-	local referral = ensureFields(profile)
-	referral.Invited += count
-
-	local cash = Config.Referral.RewardCash * count
-	PlayerService.AddCash(inviter, cash)
-	local eggDef = Config.EggsById[Config.Referral.RewardEgg]
+-- Zahlt `count` Belohnungen an einen ONLINE-Spieler aus (Cash + Gratis-Ei)
+local function payoutOnline(inviter: Player, count: number)
 	for _ = 1, count do
-		local result = PetService.GrantEgg(inviter, Config.Referral.RewardEgg)
-		if result.ok then
-			notifyRemote:FireClient(inviter, ("🥚 Einladungs-Bonus-Ei (%s): %s"):format(eggDef and eggDef.Name or "?", result.msg))
-		end
-	end
-	notifyRemote:FireClient(
-		inviter,
-		("🎁 EINLADUNG ERFOLGREICH! %d Freund(e) haben Rebirth %d erreicht: +%d💰!"):format(
-			count,
-			Config.Referral.MilestoneRebirths,
-			cash
+		PlayerService.AddCash(inviter, Config.ReferralRewardCash)
+		local result = PetService.GrantEgg(inviter, Config.ReferralRewardEgg)
+		notifyRemote:FireClient(
+			inviter,
+			("🎉 EINLADUNGS-BONUS: +%d💰 und ein Gratis-Ei! %s"):format(
+				Config.ReferralRewardCash,
+				result.ok and result.msg or ""
+			)
 		)
-	)
+	end
 	sfxRemote:FireClient(inviter, "ding")
 end
 
--- Erfolg für einen (evtl. offline) Einlader verbuchen
-local function creditInviter(inviterUserId: number, invitedName: string)
-	-- Online im selben Server? Direkt auszahlen, kein DataStore nötig.
-	local inviter = Players:GetPlayerByUserId(inviterUserId)
-	if inviter and DataService.Get(inviter) then
-		grantInviterReward(inviter, 1)
+-- Meilenstein des Eingeladenen verrechnen (genau einmal)
+local function completeReferral(player: Player)
+	local record = records[player]
+	if not record or record.Completed or record.InvitedBy <= 0 then
+		return
+	end
+	-- Eigenen Datensatz zuerst dauerhaft als "verrechnet" markieren
+	-- (UpdateAsync prüft nochmal, falls zwei Server gleichzeitig rennen)
+	local alreadyDone = false
+	local ok, saved = updateRecord(player.UserId, function(data)
+		if data.Completed then
+			alreadyDone = true
+		end
+		data.Completed = true
+		return data
+	end)
+	if not ok then
+		return -- DataStore down: beim nächsten Rebirth-Event erneut versuchen
+	end
+	records[player] = saved or record
+	records[player].Completed = true
+	if alreadyDone then
+		return
+	end
+
+	local inviterId = record.InvitedBy
+
+	-- Einlader gutschreiben: Zähler hoch; offline zusätzlich als Pending vormerken
+	local inviter: Player? = Players:GetPlayerByUserId(inviterId)
+	local inviterOnline = inviter ~= nil and inviter.Parent ~= nil
+	local okInviter, inviterRecord = updateRecord(inviterId, function(data)
+		data.SuccessCount += 1
+		if not inviterOnline then
+			data.PendingRewards += 1
+		end
+		return data
+	end)
+	if okInviter and inviter and inviterRecord and records[inviter] then
+		records[inviter] = inviterRecord -- Cache frisch halten (fürs UI)
+	end
+
+	if inviter and inviterOnline then
+		payoutOnline(inviter, 1)
 		announceRemote:FireAllClients(
-			("🎁 %s wurde von %s eingeladen und hat Rebirth geschafft – Einladungs-Bonus kassiert!"):format(
-				invitedName,
-				inviter.Name
-			),
+			("🤝 %s hat Rebirth 1 geschafft – Einlader %s kassiert die Prämie!"):format(player.Name, inviter.Name),
 			"Legendary"
 		)
-		return
 	end
-
-	-- Sonst: Pending-Zähler im Referral-Store hochzählen (atomar)
-	if not pendingStore then
-		warn("[ReferralService] Kein DataStore-Zugriff – Offline-Gutschrift geht verloren!")
-		return
-	end
-	local ok, err = pcall(function()
-		pendingStore:UpdateAsync("Pending_" .. inviterUserId, function(current)
-			return (tonumber(current) or 0) + 1
-		end)
-	end)
-	if not ok then
-		warn("[ReferralService] Pending-Gutschrift fehlgeschlagen für", inviterUserId, err)
-	end
+	notifyRemote:FireClient(player, "🤝 Dein Einlader hat gerade seine Einladungs-Prämie bekommen – danke dir!")
 end
 
--- Beim Join: aufgelaufene Offline-Gutschriften abholen (lesen + auf 0 setzen)
-local function claimPending(player: Player)
-	if not pendingStore then
-		return
-	end
-	local claimed = 0
-	local ok, err = pcall(function()
-		pendingStore:UpdateAsync("Pending_" .. player.UserId, function(current)
-			claimed = tonumber(current) or 0
-			return 0
-		end)
-	end)
-	if not ok then
-		warn("[ReferralService] Pending-Abholung fehlgeschlagen für", player.Name, err)
-		return
-	end
-	if claimed > 0 and player.Parent then
-		grantInviterReward(player, claimed)
-	end
-end
+-- ══════════ Remote-Handler ══════════
 
--- ══════════ Code einlösen ══════════
-
-local function redeem(player: Player, rawCode: any)
-	if typeof(rawCode) ~= "string" or #rawCode > 40 then
-		return { ok = false, msg = "Das sieht nicht nach einem Code aus." }
-	end
-	local profile = DataService.Get(player)
-	if not profile then
-		return { ok = false, msg = "Daten noch nicht geladen..." }
-	end
-	local referral = ensureFields(profile)
-
-	local inviterUserId = parseCode(rawCode)
-	if not inviterUserId then
-		return { ok = false, msg = "Ungültiger Code. Format: YEET-12345" }
-	end
-	if inviterUserId == player.UserId then
-		return { ok = false, msg = "Netter Versuch – dich selbst einladen zählt nicht! 😄" }
-	end
-	if referral.ReferredBy ~= 0 then
-		return { ok = false, msg = "Du wurdest schon von jemandem eingeladen!" }
-	end
-	-- Nur ECHTE Neulinge dürfen einlösen, sonst wäre der Meilenstein
-	-- (Rebirth 1) für Bestands-Spieler sofort erfüllt -> Farm-Exploit.
-	if profile.Rebirths > 0 then
-		return { ok = false, msg = "Codes können nur NEUE Spieler (vor dem ersten Rebirth) einlösen." }
-	end
-
-	-- Existiert der Einladende überhaupt? (Web-Call, validiert die UserId)
-	local ok, inviterName = pcall(function()
-		return Players:GetNameFromUserIdAsync(inviterUserId)
-	end)
-	if not ok or typeof(inviterName) ~= "string" then
-		return { ok = false, msg = "Diesen Spieler gibt es nicht – Code nochmal prüfen!" }
-	end
-
-	referral.ReferredBy = inviterUserId
-	notifyRemote:FireClient(
-		player,
-		("🤝 Verknüpft! Schaffst du Rebirth %d, kassiert %s eine fette Belohnung."):format(
-			Config.Referral.MilestoneRebirths,
-			inviterName
-		)
-	)
-	return { ok = true, msg = ("Code von %s eingelöst – viel Spaß beim YEETen!"):format(inviterName) }
-end
-
--- ══════════ Info fürs UI ══════════
-
-local function getInfo(player: Player)
-	local profile = DataService.Get(player)
-	if not profile then
+local function getReferralInfo(player: Player)
+	local record = records[player]
+	if not record then
 		return nil
 	end
-	local referral = ensureFields(profile)
+	local profile = DataService.Get(player)
 	return {
-		Code = ReferralService.CodeFor(player.UserId),
-		Invited = referral.Invited,
-		ReferredBy = referral.ReferredBy,
-		CanRedeem = referral.ReferredBy == 0 and profile.Rebirths == 0,
+		Code = codeFor(player.UserId),
+		SuccessCount = record.SuccessCount,
+		InvitedBy = record.InvitedBy,
+		-- Einlösen geht nur für "frische" Spieler: noch nicht verknüpft + vor Rebirth 1
+		CanRedeem = record.InvitedBy == 0 and (profile == nil or profile.Rebirths == 0),
+	}
+end
+
+local function redeemReferral(player: Player, code: any)
+	if typeof(code) ~= "string" then
+		return { ok = false, msg = "Ungültige Anfrage." }
+	end
+	local record = records[player]
+	if not record then
+		return { ok = false, msg = "Daten noch nicht geladen – versuch's gleich nochmal." }
+	end
+	if not store then
+		return { ok = false, msg = "Speicher gerade nicht erreichbar – später nochmal versuchen." }
+	end
+	if record.InvitedBy > 0 then
+		return { ok = false, msg = "Du hast schon einen Einladungs-Code eingelöst!" }
+	end
+
+	local profile = DataService.Get(player)
+	if profile and profile.Rebirths > 0 then
+		return { ok = false, msg = "Einladungs-Codes sind nur für NEUE Spieler (vor dem ersten Rebirth)." }
+	end
+
+	local inviterId = parseCode(code)
+	if not inviterId then
+		return { ok = false, msg = ("Das sieht nicht nach einem Code aus (Format: %s12345)."):format(Config.ReferralCodePrefix) }
+	end
+	if inviterId == player.UserId then
+		return { ok = false, msg = "Netter Versuch – dich selbst einladen zählt nicht! 😄" }
+	end
+
+	-- Gibt es den Einlader überhaupt? (validiert die UserId)
+	local okName, inviterName = pcall(function()
+		return Players:GetNameFromUserIdAsync(inviterId)
+	end)
+	if not okName then
+		return { ok = false, msg = "Diesen Code kennt hier niemand – Tippfehler?" }
+	end
+
+	-- Dauerhaft verknüpfen (merge-sicher; falls parallel schon verknüpft: abbrechen)
+	local alreadyLinked = false
+	local ok, saved = updateRecord(player.UserId, function(data)
+		if data.InvitedBy > 0 then
+			alreadyLinked = true
+		else
+			data.InvitedBy = inviterId
+		end
+		return data
+	end)
+	if not ok then
+		return { ok = false, msg = "Speichern fehlgeschlagen – später nochmal versuchen." }
+	end
+	if alreadyLinked then
+		return { ok = false, msg = "Du hast schon einen Einladungs-Code eingelöst!" }
+	end
+	records[player] = saved or record
+	records[player].InvitedBy = inviterId
+
+	local inviter = Players:GetPlayerByUserId(inviterId)
+	if inviter then
+		notifyRemote:FireClient(inviter, ("🤝 %s ist über deinen Code beigetreten! Prämie gibt's bei Rebirth 1."):format(player.Name))
+	end
+	return {
+		ok = true,
+		msg = ("Verknüpft mit %s! Schaffst du Rebirth 1, bekommt dein Einlader die Prämie."):format(inviterName),
 	}
 end
 
@@ -213,38 +253,61 @@ function ReferralService.Init(services)
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent;
 
-	(Remotes.Get("RedeemReferral") :: RemoteFunction).OnServerInvoke = redeem;
-	(Remotes.Get("GetReferralInfo") :: RemoteFunction).OnServerInvoke = getInfo
+	(Remotes.Get("GetReferralInfo") :: RemoteFunction).OnServerInvoke = getReferralInfo;
+	(Remotes.Get("RedeemReferral") :: RemoteFunction).OnServerInvoke = redeemReferral
 
 	local ok, result = pcall(function()
-		return DataStoreService:GetDataStore(Config.Referral.DataStoreName)
+		return DataStoreService:GetDataStore(Config.ReferralDataStore)
 	end)
 	if ok then
-		pendingStore = result
+		store = result
 	else
-		warn("[ReferralService] Kein DataStore-Zugriff – Referral-Gutschriften nur bei Online-Einladern.")
+		warn("[ReferralService] Kein DataStore-Zugriff – Referrals werden NICHT gespeichert.")
 	end
 
 	local function onPlayerAdded(player: Player)
+		-- Eigenen Datensatz laden + offene Belohnungen abholen (merge-sicher:
+		-- UpdateAsync nullt Pending und liefert den alten Stand zurück)
 		task.spawn(function()
-			local profile = DataService.WaitFor(player)
-			if not profile then
+			local pendingToPay = 0
+			local okLoad, saved = updateRecord(player.UserId, function(data)
+				pendingToPay = data.PendingRewards
+				data.PendingRewards = 0
+				return data
+			end)
+			if not okLoad then
+				records[player] = records[player] or defaultRecord() -- offline-Fallback (Studio ohne API)
 				return
 			end
-			ensureFields(profile)
-
-			-- Einladungs-Link? LaunchData "ref=<UserId>" löst automatisch ein.
-			local joinData = player:GetJoinData()
-			local launchData = joinData and joinData.LaunchData
-			if typeof(launchData) == "string" then
-				local refId = launchData:match("ref=(%d+)")
-				if refId then
-					redeem(player, refId)
+			if not player.Parent then
+				return
+			end
+			records[player] = saved or defaultRecord()
+			if pendingToPay > 0 then
+				DataService.WaitFor(player) -- Cash/Eier brauchen das Profil
+				if player.Parent then
+					payoutOnline(player, pendingToPay)
 				end
 			end
+		end)
 
-			-- Aufgelaufene Offline-Gutschriften abholen
-			claimPending(player)
+		-- Meilenstein "Rebirth 1" über den replizierten leaderstats-Wert erkennen
+		task.spawn(function()
+			local stats = player:WaitForChild("leaderstats", 20)
+			local rebirths = stats and stats:WaitForChild("Rebirths", 20) :: IntValue?
+			if not rebirths then
+				return
+			end
+			rebirths.Changed:Connect(function(value)
+				if value >= 1 then
+					task.spawn(completeReferral, player)
+				end
+			end)
+			-- Alt-Fall: Spieler war beim Einlösen verknüpft, hat aber in einer
+			-- anderen Session gerebirtht, bevor der Server es mitbekam
+			if rebirths.Value >= 1 then
+				task.spawn(completeReferral, player)
+			end
 		end)
 	end
 	Players.PlayerAdded:Connect(onPlayerAdded)
@@ -252,29 +315,8 @@ function ReferralService.Init(services)
 		onPlayerAdded(player)
 	end
 
-	-- Meilenstein-Wache: hat ein Eingeladener seinen Rebirth geschafft,
-	-- wird der Einladende EINMALIG belohnt (MilestoneReported schützt
-	-- gegen Doppel-Vergabe, übersteht auch Rejoins).
-	task.spawn(function()
-		while true do
-			task.wait(Config.Referral.CheckInterval)
-			for _, player in Players:GetPlayers() do
-				local profile = DataService.Get(player)
-				if not profile then
-					continue
-				end
-				local referral = ensureFields(profile)
-				if
-					referral.ReferredBy ~= 0
-					and not referral.MilestoneReported
-					and profile.Rebirths >= Config.Referral.MilestoneRebirths
-				then
-					referral.MilestoneReported = true
-					notifyRemote:FireClient(player, "🎁 Rebirth geschafft – dein Einlader bekommt seine Belohnung!")
-					task.spawn(creditInviter, referral.ReferredBy, player.Name)
-				end
-			end
-		end
+	Players.PlayerRemoving:Connect(function(player)
+		records[player] = nil
 	end)
 end
 

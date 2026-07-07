@@ -1,22 +1,26 @@
 --[[
 	AchievementService.luau
-	Meilenstein-Belohnungen (Config.Achievements) mit optionalen echten
-	Roblox-Badges (BadgeService:AwardBadge, sobald BadgeIds eingetragen sind).
+	Meilenstein-Achievements mit optionalen Roblox-Badges.
 
-	- Serverseitiges Tracking im Profil: profile.Achievements = { [id] = true }
-	  (einmalige Vergabe, übersteht Rejoins) + profile.AchStats für kumulative
-	  Zähler (Banked/Cracks/Golden), die nirgendwo sonst gezählt werden.
-	- Beide Felder werden hier LAZY angelegt – DataService bleibt unberührt,
-	  der Save schreibt sie automatisch mit (gleiche Profil-Tabelle).
-	- Stats aus dem Profil (Rebirths, TotalYeets, BaseLevel, Pets) werden
-	  per Poll-Schleife geprüft; Zähler-Stats feuern sofort über AddStat.
-	- BaseService gehört dem Kollegen: statt ihn umzubauen, werden
-	  AddToVault/TryCrack von außen UMHÜLLT (gleiches Muster wie der
-	  ApplySpeed-Wrapper im PetService).
+	- Eigener DataStore (Config.AchievementDataStore) mit Stats + Unlocked pro
+	  Spieler -> nichts wird doppelt vergeben, auch nicht über Sessions hinweg.
+	- Andere Services melden Fortschritt über AchievementService.Track(player,
+	  stat, amount) bzw. TrackMax(player, stat, value). Vor dem Daten-Load
+	  gemeldete Events werden gepuffert und nachgezogen.
+	- Rebirths kommen NICHT über einen Hook in der Rebirth-Logik (die gehört
+	  dem Kollegen), sondern über den leaderstats-Wert (repliziert von
+	  PlayerService.Sync) – TrackMax zieht auch Alt-Spieler rückwirkend nach.
+	- Tresor-Knacken: BaseService bleibt unangetastet – stattdessen wird
+	  BaseService.TryCrack UMHÜLLT (gleiches Pattern wie der ApplySpeed-Wrapper
+	  im PetService). Erfolg = Tresor des Besitzers ist danach kleiner.
+	- Badge-Vergabe über BadgeService:AwardBadge, sobald echte BadgeIds in
+	  Config.Achievements eingetragen sind (BadgeId = 0 -> nur intern).
 ]]
 
 local Players = game:GetService("Players")
 local BadgeService = game:GetService("BadgeService")
+local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -24,58 +28,38 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local AchievementService = {}
 
-local DataService -- in Init verdrahtet
+local DataService, BaseService -- in Init verdrahtet
 
-local unlockedRemote: RemoteEvent
 local announceRemote: RemoteEvent
+local unlockedRemote: RemoteEvent
 local sfxRemote: RemoteEvent
 
--- Fehlende Achievement-Felder im Profil anlegen (Alt-Spielstände!)
-local function ensureFields(profile)
-	if typeof(profile.Achievements) ~= "table" then
-		profile.Achievements = {}
-	end
-	if typeof(profile.AchStats) ~= "table" then
-		profile.AchStats = { Banked = 0, Cracks = 0, Golden = 0 }
-	end
-	return profile
+local store = nil
+local records: { [Player]: any } = {} -- { Stats = {[stat]=n}, Unlocked = {[id]=true} }
+local dirty: { [Player]: boolean } = {} -- nur geänderte Datensätze speichern
+-- Events, die VOR dem Daten-Load reinkamen (z.B. Join-Rennen)
+local pending: { [Player]: { { Stat: string, Amount: number, IsMax: boolean } } } = {}
+
+local function defaultRecord()
+	return { Stats = {}, Unlocked = {} }
 end
 
--- Aktuellen Wert eines Achievement-Stats ermitteln
-local function getStat(profile, stat: string): number
-	if stat == "Rebirths" then
-		return profile.Rebirths or 0
-	elseif stat == "TotalYeets" then
-		return profile.TotalYeets or 0
-	elseif stat == "BaseLevel" then
-		return profile.BaseLevel or 1
-	elseif stat == "LegendaryPet" then
-		for petId in profile.Pets do
-			local def = Config.EggPetsById[petId]
-			if def and (def.Rarity == "Legendary" or def.Rarity == "Mythic") then
-				return 1
-			end
-		end
-		return 0
+-- ══════════ Freischalten ══════════
+
+local function unlock(player: Player, def)
+	local record = records[player]
+	if not record or record.Unlocked[def.Id] then
+		return
 	end
-	return profile.AchStats[stat] or 0
-end
+	record.Unlocked[def.Id] = true
+	dirty[player] = true
 
-local function award(player: Player, profile, def)
-	profile.Achievements[def.Id] = true
-
-	-- Popup nur an den Spieler; große Meilensteine zusätzlich server-weit
+	-- Popup nur an den Spieler (AchievementUnlocked-Queue im Client-UI)
 	unlockedRemote:FireClient(player, def.Name, def.Desc)
+	announceRemote:FireAllClients(("🏅 %s hat das Achievement '%s' freigeschaltet!"):format(player.Name, def.Name), "Legendary")
 	sfxRemote:FireClient(player, "ding")
-	if def.Announce then
-		announceRemote:FireAllClients(
-			("🏆 %s hat das Achievement '%s' freigeschaltet!"):format(player.Name, def.Name),
-			"Legendary"
-		)
-	end
 
-	-- Echtes Roblox-Badge vergeben, sobald eine Id eingetragen ist.
-	-- 0 = Platzhalter (siehe Config.Achievements) -> nur In-Game-Popup.
+	-- Echte Roblox-Badge vergeben (nur wenn im Creator Dashboard angelegt + Id eingetragen)
 	if def.BadgeId and def.BadgeId > 0 then
 		task.spawn(function()
 			local ok, err = pcall(function()
@@ -88,80 +72,160 @@ local function award(player: Player, profile, def)
 	end
 end
 
--- Alle noch offenen Achievements gegen den aktuellen Stand prüfen
-function AchievementService.Check(player: Player)
-	local profile = DataService.Get(player)
-	if not profile then
+local function checkUnlocks(player: Player)
+	local record = records[player]
+	if not record then
 		return
 	end
-	ensureFields(profile)
 	for _, def in Config.Achievements do
-		if not profile.Achievements[def.Id] and getStat(profile, def.Stat) >= def.Value then
-			award(player, profile, def)
+		if not record.Unlocked[def.Id] and (record.Stats[def.Stat] or 0) >= def.Goal then
+			unlock(player, def)
 		end
 	end
 end
 
--- Kumulativen Zähler erhöhen (rufen Wrapper + andere Services auf)
-function AchievementService.AddStat(player: Player, stat: string, amount: number)
-	local profile = DataService.Get(player)
-	if not profile then
+-- ══════════ Öffentliche API (rufen andere Services auf) ══════════
+
+-- Zähler um `amount` erhöhen (z.B. "Banked" +1 pro Einlagerung)
+function AchievementService.Track(player: Player, stat: string, amount: number)
+	local record = records[player]
+	if not record then
+		local queue = pending[player]
+		if not queue then
+			queue = {}
+			pending[player] = queue
+		end
+		table.insert(queue, { Stat = stat, Amount = amount, IsMax = false })
 		return
 	end
-	ensureFields(profile)
-	profile.AchStats[stat] = (profile.AchStats[stat] or 0) + amount
-	AchievementService.Check(player)
+	record.Stats[stat] = (record.Stats[stat] or 0) + amount
+	dirty[player] = true
+	checkUnlocks(player)
 end
+
+-- Zähler auf mindestens `value` heben (für absolute Werte wie Rebirths)
+function AchievementService.TrackMax(player: Player, stat: string, value: number)
+	local record = records[player]
+	if not record then
+		local queue = pending[player]
+		if not queue then
+			queue = {}
+			pending[player] = queue
+		end
+		table.insert(queue, { Stat = stat, Amount = value, IsMax = true })
+		return
+	end
+	if value > (record.Stats[stat] or 0) then
+		record.Stats[stat] = value
+		dirty[player] = true
+		checkUnlocks(player)
+	end
+end
+
+-- ══════════ Laden/Speichern ══════════
+
+local function load(player: Player)
+	local record = defaultRecord()
+	if store then
+		local ok, saved = pcall(function()
+			return store:GetAsync("Ach_" .. player.UserId)
+		end)
+		if ok and typeof(saved) == "table" then
+			record.Stats = typeof(saved.Stats) == "table" and saved.Stats or {}
+			record.Unlocked = typeof(saved.Unlocked) == "table" and saved.Unlocked or {}
+		elseif not ok then
+			warn("[AchievementService] Laden fehlgeschlagen für", player.Name, saved)
+		end
+	end
+	records[player] = record
+
+	-- Gepufferte Events nachziehen
+	local queue = pending[player]
+	pending[player] = nil
+	if queue then
+		for _, item in queue do
+			if item.IsMax then
+				AchievementService.TrackMax(player, item.Stat, item.Amount)
+			else
+				AchievementService.Track(player, item.Stat, item.Amount)
+			end
+		end
+	end
+	checkUnlocks(player)
+end
+
+local function save(player: Player)
+	local record = records[player]
+	if not record or not store or not dirty[player] then
+		return
+	end
+	dirty[player] = nil
+	local ok, err = pcall(function()
+		store:SetAsync("Ach_" .. player.UserId, record)
+	end)
+	if not ok then
+		warn("[AchievementService] Speichern fehlgeschlagen für", player.Name, err)
+	end
+end
+
+-- ══════════ Init ══════════
 
 function AchievementService.Init(services)
 	DataService = services.DataService
+	BaseService = services.BaseService
 
-	unlockedRemote = Remotes.Get("AchievementUnlocked") :: RemoteEvent
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
+	unlockedRemote = Remotes.Get("AchievementUnlocked") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent;
 
-	-- Fürs Trophäen-Fenster: freigeschaltete Ids abfragen
+	-- Fürs UI: eigene Stats + Freischaltungen
 	(Remotes.Get("GetAchievements") :: RemoteFunction).OnServerInvoke = function(player: Player)
-		local profile = DataService.Get(player)
-		if not profile then
-			return {}
+		local record = records[player]
+		if not record then
+			return nil
 		end
-		return ensureFields(profile).Achievements
+		return { Stats = record.Stats, Unlocked = record.Unlocked }
 	end
 
-	-- ── Wrapper: Einlagerungen zählen (BaseService bleibt unangetastet) ──
-	-- Alle Aufrufer (SnackService/RewardService/Debug) schlagen das Feld zur
-	-- Laufzeit auf derselben Tabelle nach, der Wrapper greift also überall.
-	local baseAddToVault = services.BaseService.AddToVault
-	services.BaseService.AddToVault = function(owner: Player, snackName: string): boolean
-		local ok = baseAddToVault(owner, snackName)
-		if ok then
-			AchievementService.AddStat(owner, "Banked", 1)
-		end
-		return ok
+	local ok, result = pcall(function()
+		return DataStoreService:GetDataStore(Config.AchievementDataStore)
+	end)
+	if ok then
+		store = result
+	else
+		warn("[AchievementService] Kein DataStore-Zugriff – Achievements werden NICHT gespeichert.")
 	end
 
-	-- ── Wrapper: erfolgreiche Tresor-Knacks zählen ──
-	-- TryCrack gibt nichts zurück; Erfolg erkennen wir daran, dass der
-	-- Tresor des Besitzers danach WENIGER Snacks enthält (rein lesend).
-	local baseTryCrack = services.BaseService.TryCrack
-	services.BaseService.TryCrack = function(thief: Player, base)
-		local ownerProfile = base.Owner and DataService.Get(base.Owner)
-		local before = ownerProfile and #ownerProfile.Vault or 0
+	-- Tresor-Knacken zählen, OHNE BaseService anzufassen: TryCrack umhüllen.
+	-- Erfolgskriterium: der Tresor des Besitzers ist nach dem Aufruf kleiner
+	-- (alle Fehlschläge – Cooldown, leer, eigener Tresor – ändern nichts).
+	local baseTryCrack = BaseService.TryCrack
+	BaseService.TryCrack = function(thief: Player, base)
+		local owner = base.Owner
+		local profile = owner and DataService.Get(owner)
+		local before = profile and #profile.Vault or 0
 		baseTryCrack(thief, base)
-		if ownerProfile and #ownerProfile.Vault < before then
-			AchievementService.AddStat(thief, "Cracks", 1)
+		if profile and #profile.Vault < before then
+			AchievementService.Track(thief, "Cracks", 1)
 		end
 	end
 
-	-- Beim Join: Felder anlegen + Altbestände sofort prüfen (wer schon
-	-- 3 Rebirths hat, kriegt seine Popups einmalig nachgereicht)
 	local function onPlayerAdded(player: Player)
+		task.spawn(load, player)
+
+		-- Rebirth-Meilensteine über den replizierten leaderstats-Wert
+		-- (kein Eingriff in die Rebirth-Logik nötig; zieht Alt-Spieler nach)
 		task.spawn(function()
-			local profile = DataService.WaitFor(player)
-			if profile then
-				ensureFields(profile)
-				AchievementService.Check(player)
+			local stats = player:WaitForChild("leaderstats", 20)
+			local rebirths = stats and stats:WaitForChild("Rebirths", 20) :: IntValue?
+			if not rebirths then
+				return
+			end
+			rebirths.Changed:Connect(function(value)
+				AchievementService.TrackMax(player, "Rebirths", value)
+			end)
+			if rebirths.Value > 0 then
+				AchievementService.TrackMax(player, "Rebirths", rebirths.Value)
 			end
 		end)
 	end
@@ -170,14 +234,30 @@ function AchievementService.Init(services)
 		onPlayerAdded(player)
 	end
 
-	-- Poll-Schleife für Profil-Stats (Rebirths/Yeets/BaseLevel/Pets):
-	-- billig genug, um nicht jeden Service einzeln anzapfen zu müssen
+	Players.PlayerRemoving:Connect(function(player)
+		save(player)
+		records[player] = nil
+		dirty[player] = nil
+		pending[player] = nil
+	end)
+
+	-- Autosave (gleiche Kadenz wie der DataService)
 	task.spawn(function()
 		while true do
-			task.wait(Config.AchievementCheckInterval)
-			for _, player in Players:GetPlayers() do
-				AchievementService.Check(player)
+			task.wait(Config.AutosaveInterval)
+			for player in records do
+				task.spawn(save, player)
 			end
+		end
+	end)
+
+	game:BindToClose(function()
+		if RunService:IsStudio() then
+			task.wait(1)
+			return
+		end
+		for player in records do
+			save(player)
 		end
 	end)
 end

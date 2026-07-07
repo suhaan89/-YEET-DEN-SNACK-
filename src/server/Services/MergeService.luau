@@ -19,7 +19,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local MergeService = {}
 
-local DataService, BaseService, MapService, SeasonPassService -- in Init verdrahtet
+local DataService, BaseService, MapService, SeasonPassService, AchievementService -- in Init verdrahtet
 
 local announceRemote: RemoteEvent
 local sfxRemote: RemoteEvent
@@ -94,6 +94,7 @@ local function doMerge(player: Player, snackName: any, count: any)
 	SeasonPassService.AddXp(player, "MergeTry")
 	if success then
 		SeasonPassService.AddXp(player, "MergeSuccess")
+		AchievementService.Track(player, "Merges", 1)
 	end
 
 	if success then
@@ -131,6 +132,7 @@ function MergeService.Init(services)
 	BaseService = services.BaseService
 	MapService = services.MapService
 	SeasonPassService = services.SeasonPassService
+	AchievementService = services.AchievementService
 
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent;

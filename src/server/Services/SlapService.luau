@@ -14,7 +14,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local SlapService = {}
 
-local SnackService, DataService, Ragdoll -- in Init verdrahtet
+local SnackService, DataService, Ragdoll, AchievementService -- in Init verdrahtet
 
 local lastSlap: { [Player]: number } = {}
 local notifyRemote: RemoteEvent
@@ -119,12 +119,19 @@ local function onSlap(player: Player)
 	powEffect(targetRoot.Position + Vector3.new(0, 2, 0))
 	sfxRemote:FireAllClients("slap", targetRoot.Position)
 	notifyRemote:FireClient(closest, ("👋 Geslappt von %s!"):format(player.Name))
+	AchievementService.Track(player, "Slaps", 1)
+end
+
+-- Debug-Hook: Slap-Cooldown eines Spielers zurücksetzen (fürs Test-Menü)
+function SlapService.DebugResetCooldown(player: Player)
+	lastSlap[player] = nil
 end
 
 function SlapService.Init(services)
 	SnackService = services.SnackService
 	DataService = services.DataService
 	Ragdoll = services.Ragdoll
+	AchievementService = services.AchievementService
 
 	notifyRemote = Remotes.Get("Notify") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent;

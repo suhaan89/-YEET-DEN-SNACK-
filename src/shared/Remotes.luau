@@ -14,7 +14,7 @@ local EVENTS = {
 	"Notify", -- Server -> ein Client: kleine Toast-Nachricht
 	"Fling", -- Server -> ein Client: eigene Velocity setzen (Client besitzt die Charakter-Physik!)
 	"Sfx", -- Server -> alle Clients: Sound abspielen (name, position?)
-	"OpenShop", -- Server -> ein Client: Shop-UI öffnen (shopId: "Upgrade"|"Pets"|"Style"|"Merge"|"Housing")
+	"OpenShop", -- Server -> ein Client: Shop-UI öffnen (shopId: "Upgrade"|"Pets"|"Style"|"Merge")
 	"AchievementUnlocked", -- Server -> ein Client: Achievement-Popup (name, desc)
 }
 
@@ -31,13 +31,13 @@ local FUNCTIONS = {
 	"GetCollections", -- Client -> Server: eigene Pets/Trails + Ausrüstung abfragen
 	"GetVault", -- Client -> Server: eigenen Tresor-Inhalt abfragen (Liste von Snack-Namen)
 	"DoMerge", -- Client -> Server: Merge versuchen (snackName, count), gibt {ok, success?, msg} zurück
+	"GetAchievements", -- Client -> Server: eigene Achievement-Stats + Freischaltungen abfragen
+	"GetReferralInfo", -- Client -> Server: eigenen Referral-Code + Einladungs-Statistik abfragen
+	"RedeemReferral", -- Client -> Server: Referral-Code einlösen (code), gibt {ok, msg} zurück
+	"GetHousing", -- Client -> Server: eigene Deko (gekauft + platziert) abfragen
+	"BuyDecor", -- Client -> Server: Deko-Objekt kaufen (decorId), gibt {ok, msg} zurück
+	"PlaceDecor", -- Client -> Server: Deko aufstellen/entfernen (decorId, place), gibt {ok, msg} zurück
 	"DebugCommand", -- Client -> Server: Debug-Menü ("list" oder Command-Id) – nur Whitelist/Studio!
-	"GetAchievements", -- Client -> Server: eigene freigeschaltete Achievement-Ids abfragen
-	"GetReferralInfo", -- Client -> Server: eigener Referral-Code + Einladungs-Statistik
-	"RedeemReferral", -- Client -> Server: fremden Referral-Code einlösen, gibt {ok, msg} zurück
-	"GetHousing", -- Client -> Server: eigene Deko-Sammlung + belegte Slots abfragen
-	"BuyDeco", -- Client -> Server: Deko-Objekt kaufen (decoId), gibt {ok, msg} zurück
-	"PlaceDeco", -- Client -> Server: Deko in Slot setzen (slotIndex, decoId oder ""), gibt {ok, msg} zurück
 }
 
 local Remotes = {}

@@ -967,208 +967,6 @@ local function buildMergeUi()
 	layout.Parent = mergeList
 end
 
--- ══════════ Basis-Deko (Housing) ══════════
--- Wird über das pinke Deko-Pad an der eigenen Basis geöffnet (OpenShop
--- "Housing"). Oben die 6 Slots mit Blätter-Buttons, darunter der Deko-Shop.
-
-local housingCache: any = { Owned = {}, Slots = {} }
-local refreshHousing: () -> () = function() end
-
-local function buildHousing()
-	local frame = makeWindow("🏡 BASIS-DEKO", Vector2.new(470, 540), Color3.fromRGB(255, 150, 210))
-	shopWindows.Housing = frame
-
-	local list = Instance.new("ScrollingFrame")
-	list.Position = UDim2.new(0, 12, 0, 48)
-	list.Size = UDim2.new(1, -24, 1, -60)
-	list.BackgroundTransparency = 1
-	list.BorderSizePixel = 0
-	list.ScrollBarThickness = 6
-	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	list.CanvasSize = UDim2.new()
-	list.Parent = frame
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 6)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = list
-
-	-- ── Sektion 1: Slots mit Blätter-Buttons ──
-	local slotHeader = makeLabel(list, {
-		Size = UDim2.new(1, -8, 0, 26),
-		Text = "📍 DEINE DEKO-SLOTS",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextColor3 = Color3.fromRGB(255, 180, 225),
-	})
-	slotHeader.LayoutOrder = 1
-
-	-- Blätter-Optionen: "leer" + alle Decos, die man besitzt (Config-Reihenfolge)
-	local function ownedOptions(): { string }
-		local options = { "" }
-		for _, def in Config.Decorations do
-			if housingCache.Owned and housingCache.Owned[def.Id] then
-				table.insert(options, def.Id)
-			end
-		end
-		return options
-	end
-
-	local slotLabels: { TextLabel } = {}
-	for slotIndex = 1, #Config.DecoSlots do
-		local row = Instance.new("Frame")
-		row.Size = UDim2.new(1, -8, 0, 46)
-		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
-		row.LayoutOrder = 1 + slotIndex
-		roundify(row, 10)
-		row.Parent = list
-
-		makeLabel(row, {
-			Position = UDim2.fromOffset(10, 2),
-			Size = UDim2.fromOffset(64, 42),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = ("Slot %d"):format(slotIndex),
-			TextColor3 = Color3.fromRGB(190, 190, 200),
-		})
-		local currentLabel = makeLabel(row, {
-			Position = UDim2.fromOffset(80, 2),
-			Size = UDim2.new(1, -190, 1, -4),
-			Text = "– leer –",
-			TextColor3 = Color3.new(1, 1, 1),
-		})
-		slotLabels[slotIndex] = currentLabel
-
-		-- Server-Aufruf: nächste/vorherige Option in diesen Slot setzen
-		local function cycle(direction: number)
-			local options = ownedOptions()
-			if #options <= 1 then
-				Ui.Toast("❌ Erst unten Deko kaufen!")
-				return
-			end
-			local current = housingCache.Slots and housingCache.Slots[tostring(slotIndex)] or ""
-			local index = table.find(options, current) or 1
-			index = (index - 1 + direction) % #options + 1
-			task.spawn(function()
-				local ok, result = pcall(function()
-					return (Remotes.Get("PlaceDeco") :: RemoteFunction):InvokeServer(slotIndex, options[index])
-				end)
-				if ok and result then
-					Ui.Toast((result.ok and "🏡 " or "❌ ") .. result.msg)
-				end
-				refreshHousing()
-			end)
-		end
-
-		for _, dir in { { Text = "◀", X = -54, Dir = -1 }, { Text = "▶", X = -8, Dir = 1 } } do
-			local button = Instance.new("TextButton")
-			button.AnchorPoint = Vector2.new(1, 0.5)
-			button.Position = UDim2.new(1, dir.X, 0.5, 0)
-			button.Size = UDim2.fromOffset(40, 34)
-			button.BackgroundColor3 = Color3.fromRGB(150, 70, 220)
-			button.Font = FONT
-			button.TextScaled = true
-			button.Text = dir.Text
-			button.TextColor3 = Color3.new(1, 1, 1)
-			roundify(button, 8)
-			button.Parent = row
-			button.Activated:Connect(function()
-				cycle(dir.Dir)
-			end)
-		end
-	end
-
-	-- ── Sektion 2: Deko-Shop ──
-	local shopHeader = makeLabel(list, {
-		Size = UDim2.new(1, -8, 0, 26),
-		Text = "🛒 DEKO KAUFEN",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextColor3 = Color3.fromRGB(255, 220, 120),
-	})
-	shopHeader.LayoutOrder = 50
-
-	local buyButtons: { [string]: TextButton } = {}
-	for i, def in Config.Decorations do
-		local row = Instance.new("Frame")
-		row.Size = UDim2.new(1, -8, 0, 54)
-		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
-		row.LayoutOrder = 50 + i
-		roundify(row, 10)
-		row.Parent = list
-
-		makeLabel(row, {
-			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -140, 0, 26),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = def.Name,
-			TextColor3 = Color3.fromRGB(255, 190, 230),
-		})
-		makeLabel(row, {
-			Position = UDim2.fromOffset(10, 32),
-			Size = UDim2.new(1, -140, 0, 16),
-			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = def.Desc,
-			TextColor3 = Color3.fromRGB(190, 190, 200),
-			TextScaled = false,
-			TextSize = 13,
-		})
-
-		local button = Instance.new("TextButton")
-		button.AnchorPoint = Vector2.new(1, 0.5)
-		button.Position = UDim2.new(1, -8, 0.5, 0)
-		button.Size = UDim2.fromOffset(115, 38)
-		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
-		button.Font = FONT
-		button.TextScaled = true
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Text = formatNumber(def.Cost) .. "💰"
-		roundify(button, 10)
-		button.Parent = row
-		buyButtons[def.Id] = button
-
-		button.Activated:Connect(function()
-			if housingCache.Owned and housingCache.Owned[def.Id] then
-				Ui.Toast("✅ Hast du schon – oben in einen Slot blättern!")
-				return
-			end
-			task.spawn(function()
-				local ok, result = pcall(function()
-					return (Remotes.Get("BuyDeco") :: RemoteFunction):InvokeServer(def.Id)
-				end)
-				if ok and result then
-					Ui.Toast((result.ok and "🏡 " or "❌ ") .. result.msg)
-				end
-				refreshHousing()
-			end)
-		end)
-	end
-
-	refreshHousing = function()
-		task.spawn(function()
-			local ok, data = pcall(function()
-				return (Remotes.Get("GetHousing") :: RemoteFunction):InvokeServer()
-			end)
-			if not ok or typeof(data) ~= "table" then
-				return
-			end
-			housingCache = data
-			for slotIndex, label in slotLabels do
-				local decoId = data.Slots and data.Slots[tostring(slotIndex)]
-				local def = decoId and Config.DecorationsById[decoId]
-				label.Text = def and def.Name or "– leer –"
-				label.TextColor3 = def and Color3.fromRGB(255, 220, 120) or Color3.fromRGB(150, 145, 165)
-			end
-			for decoId, button in buyButtons do
-				if data.Owned and data.Owned[decoId] then
-					button.Text = "✓ GEKAUFT"
-					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
-				else
-					local def = Config.DecorationsById[decoId]
-					button.Text = formatNumber(def.Cost) .. "💰"
-					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
-				end
-			end
-		end)
-	end
-end
-
 -- ══════════ Fenster öffnen (vom OpenShop-Remote getriggert) ══════════
 
 function Ui.OpenShop(shopId: string)
@@ -1186,8 +984,6 @@ function Ui.OpenShop(shopId: string)
 		refreshCollectionShops()
 	elseif shopId == "Merge" then
 		refreshMerge()
-	elseif shopId == "Housing" then
-		refreshHousing()
 	end
 end
 
@@ -1331,49 +1127,47 @@ local function buildSupremeBar()
 end
 
 -- ══════════ Freundes-Bonus-Anzeige ══════════
--- Kleines Badge unter der Supreme-Leiste, sichtbar solange mind. ein
--- Roblox-Freund im Server ist (Attribut "FriendBonusCount" vom Server).
+-- Kleines Badge unter der Supreme-Anzeige, solange der Server-Bonus aktiv ist
+-- (Datenquelle: "FriendsOnline"-Attribut, setzt der FriendService).
 
 local function buildFriendBonus()
 	local frame = Instance.new("Frame")
 	frame.Name = "FriendBonus"
-	frame.Position = UDim2.new(0, 12, 0, 120)
-	frame.Size = UDim2.fromOffset(190, 34)
-	frame.BackgroundColor3 = Color3.fromRGB(30, 45, 35)
-	frame.BackgroundTransparency = 0.2
+	frame.Position = UDim2.new(0, 12, 0, 120) -- unter SupremeProgress (y=66, Höhe 48)
+	frame.Size = UDim2.fromOffset(190, 30)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 55, 40)
+	frame.BackgroundTransparency = 0.25
 	frame.Visible = false
-	roundify(frame, 12)
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = Color3.fromRGB(90, 220, 130)
-	stroke.Thickness = 1.5
-	stroke.Transparency = 0.3
-	stroke.Parent = frame
+	roundify(frame, 10)
 	frame.Parent = gui
 
 	local label = makeLabel(frame, {
 		Size = UDim2.new(1, -12, 1, -6),
 		Position = UDim2.fromOffset(6, 3),
 		Text = "",
-		TextColor3 = Color3.fromRGB(140, 240, 170),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(140, 230, 160),
 	})
 
 	local function refresh()
-		local count = player:GetAttribute("FriendBonusCount")
-		if typeof(count) == "number" and count > 0 then
-			frame.Visible = true
-			label.Text = ("🤝 Freundes-Bonus: +%d%%"):format(Config.FriendBonusPercent * 100)
-		else
-			frame.Visible = false
+		local friends = player:GetAttribute("FriendsOnline")
+		local active = typeof(friends) == "number" and friends > 0
+		frame.Visible = active
+		if active then
+			label.Text = ("👫 Freundes-Bonus: +%d%%"):format(Config.FriendBonusPercent * 100)
 		end
 	end
-	player:GetAttributeChangedSignal("FriendBonusCount"):Connect(refresh)
+	player:GetAttributeChangedSignal("FriendsOnline"):Connect(refresh)
 	refresh()
 end
 
 -- ══════════ Debug-Menü (nur Entwickler) ══════════
 -- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
--- Die Buttons kommen komplett vom Server (DebugCommand "list") – neue Commands
--- im DebugService tauchen hier also automatisch auf, ohne UI-Änderung.
+-- Tabs (Spieler/Events/Diagnose/Server), Suchfeld, Ziel-Auswahl und F4-Toggle.
+-- Die Command-Buttons kommen komplett vom Server (DebugCommand "list") – neue
+-- Commands im DebugService tauchen automatisch im passenden Tab auf, ohne
+-- UI-Änderung. Die Diagnose-Tools (Zonen-Anzeige, State-Inspector, Log-Panel,
+-- Performance-HUD) laufen client-lokal und LESEN den Spielzustand nur aus.
 
 local debugBuilt = false
 
@@ -1383,68 +1177,578 @@ local function buildDebugMenu()
 	end
 	debugBuilt = true
 
+	local UserInputService = game:GetService("UserInputService")
+	local RunService = game:GetService("RunService")
 	local debugRemote = Remotes.Get("DebugCommand") :: RemoteFunction
 
+	-- Sichere Invoke-Hülle (Server prüft die Whitelist bei jedem Aufruf selbst)
+	local function invoke(action: string, payload: any?): any
+		local ok, result = pcall(function()
+			return debugRemote:InvokeServer(action, payload)
+		end)
+		return if ok then result else nil
+	end
+
+	-- ── Ziel-Auswahl: nil = ich selbst ──
+	local targetUserId: number? = nil
+
+	local function targetPayload(extra: any?): any
+		local payload = extra or {}
+		payload.Target = targetUserId
+		return payload
+	end
+
+	-- ── Hauptfenster ──
+	local panel = makeWindow("🐞 DEBUG-MENÜ", Vector2.new(620, 540), Color3.fromRGB(255, 120, 120))
+
+	local searchBox = Instance.new("TextBox")
+	searchBox.Position = UDim2.fromOffset(16, 44)
+	searchBox.Size = UDim2.new(0.5, -24, 0, 32)
+	searchBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	searchBox.Font = FONT
+	searchBox.TextSize = 16
+	searchBox.TextColor3 = Color3.new(1, 1, 1)
+	searchBox.PlaceholderText = "🔍 Aktion suchen..."
+	searchBox.Text = ""
+	searchBox.ClearTextOnFocus = false
+	roundify(searchBox, 8)
+	searchBox.Parent = panel
+
+	local targetButton = Instance.new("TextButton")
+	targetButton.AnchorPoint = Vector2.new(1, 0)
+	targetButton.Position = UDim2.new(1, -16, 0, 44)
+	targetButton.Size = UDim2.new(0.5, -24, 0, 32)
+	targetButton.BackgroundColor3 = Color3.fromRGB(70, 60, 90)
+	targetButton.Font = FONT
+	targetButton.TextScaled = true
+	targetButton.TextColor3 = Color3.fromRGB(255, 220, 120)
+	targetButton.Text = "🎯 Ziel: DU"
+	roundify(targetButton, 8)
+	targetButton.Parent = panel
+
+	local function refreshTargetButton()
+		local target = targetUserId and Players:GetPlayerByUserId(targetUserId)
+		if targetUserId and not target then
+			targetUserId = nil -- Ziel hat den Server verlassen
+		end
+		targetButton.Text = if target then ("🎯 Ziel: %s"):format(target.Name) else "🎯 Ziel: DU (klick = wechseln)"
+	end
+
+	-- Klick = zum nächsten Spieler im Server durchschalten (Kategorie 4.1)
+	targetButton.Activated:Connect(function()
+		local players = Players:GetPlayers()
+		local currentId = targetUserId or player.UserId
+		local index = 1
+		for i, p in players do
+			if p.UserId == currentId then
+				index = i
+				break
+			end
+		end
+		local nextPlayer = players[(index % #players) + 1]
+		targetUserId = if nextPlayer == player then nil else nextPlayer.UserId
+		refreshTargetButton()
+	end)
+
+	-- ── Tabs ──
+	local TABS = { "Spieler", "Events", "Diagnose", "Server" }
+	local activeTab = "Spieler"
+	local tabButtons: { [string]: TextButton } = {}
+	local rebuildRows: () -> () = function() end
+
+	local tabRow = Instance.new("Frame")
+	tabRow.Position = UDim2.fromOffset(16, 84)
+	tabRow.Size = UDim2.new(1, -32, 0, 34)
+	tabRow.BackgroundTransparency = 1
+	tabRow.Parent = panel
+	local tabLayout = Instance.new("UIListLayout")
+	tabLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabLayout.Padding = UDim.new(0, 6)
+	tabLayout.Parent = tabRow
+
+	for _, name in TABS do
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(0.25, -6, 1, 0)
+		button.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		button.Font = FONT
+		button.TextScaled = true
+		button.Text = name
+		button.TextColor3 = Color3.new(1, 1, 1)
+		roundify(button, 8)
+		button.Parent = tabRow
+		tabButtons[name] = button
+		button.Activated:Connect(function()
+			activeTab = name
+			rebuildRows()
+		end)
+	end
+
+	-- ── Command-Liste ──
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 126)
+	list.Size = UDim2.new(1, -24, 1, -138)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = panel
+	local listLayout = Instance.new("UIListLayout")
+	listLayout.Padding = UDim.new(0, 6)
+	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	listLayout.Parent = list
+
+	local commandsCache: { any } = {}
+
+	-- ── Bestätigungs-Dialog für Danger-Commands ──
+	local function confirmThen(question: string, callback: () -> ())
+		local overlay = Instance.new("TextButton")
+		overlay.Size = UDim2.fromScale(1, 1)
+		overlay.BackgroundColor3 = Color3.new(0, 0, 0)
+		overlay.BackgroundTransparency = 0.5
+		overlay.Text = ""
+		overlay.AutoButtonColor = false
+		overlay.ZIndex = 30
+		overlay.Parent = gui
+
+		local box = Instance.new("Frame")
+		box.AnchorPoint = Vector2.new(0.5, 0.5)
+		box.Position = UDim2.fromScale(0.5, 0.5)
+		box.Size = UDim2.fromOffset(400, 160)
+		box.BackgroundColor3 = Color3.fromRGB(70, 38, 44)
+		box.ZIndex = 31
+		roundify(box, 14)
+		box.Parent = overlay
+		makeLabel(box, {
+			Position = UDim2.fromOffset(14, 10),
+			Size = UDim2.new(1, -28, 0, 84),
+			Text = ("⚠️ Wirklich ausführen?\n%s\nDas kann Fortschritt zerstören!"):format(question),
+			TextWrapped = true,
+			TextScaled = false,
+			TextSize = 16,
+			ZIndex = 32,
+		})
+		local function makeChoice(text: string, color: Color3, x: number, onClick: () -> ())
+			local button = Instance.new("TextButton")
+			button.Position = UDim2.new(x, 14, 1, -54)
+			button.Size = UDim2.new(0.5, -28, 0, 42)
+			button.BackgroundColor3 = color
+			button.Font = FONT
+			button.TextScaled = true
+			button.Text = text
+			button.TextColor3 = Color3.new(1, 1, 1)
+			button.ZIndex = 32
+			roundify(button, 10)
+			button.Parent = box
+			button.Activated:Connect(onClick)
+		end
+		makeChoice("✅ JA, ausführen", Color3.fromRGB(180, 60, 60), 0, function()
+			overlay:Destroy()
+			callback()
+		end)
+		makeChoice("ABBRECHEN", Color3.fromRGB(70, 70, 90), 0.5, function()
+			overlay:Destroy()
+		end)
+		overlay.Activated:Connect(function()
+			overlay:Destroy()
+		end)
+	end
+
+	-- ── Diagnose-Tool 1: State-Inspector (links, live-aktualisiert) ──
+	local inspectorFrame = makeWindow("📋 STATE-INSPECTOR", Vector2.new(380, 470), Color3.fromRGB(150, 220, 255))
+	inspectorFrame.AnchorPoint = Vector2.new(0, 0.5)
+	inspectorFrame.Position = UDim2.new(0, 12, 0.5, 0)
+	local inspectorScroll = Instance.new("ScrollingFrame")
+	inspectorScroll.Position = UDim2.new(0, 12, 0, 48)
+	inspectorScroll.Size = UDim2.new(1, -24, 1, -60)
+	inspectorScroll.BackgroundTransparency = 1
+	inspectorScroll.BorderSizePixel = 0
+	inspectorScroll.ScrollBarThickness = 6
+	inspectorScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	inspectorScroll.CanvasSize = UDim2.new()
+	inspectorScroll.Parent = inspectorFrame
+	local inspectorText = Instance.new("TextLabel")
+	inspectorText.Size = UDim2.new(1, -8, 0, 0)
+	inspectorText.AutomaticSize = Enum.AutomaticSize.Y
+	inspectorText.BackgroundTransparency = 1
+	inspectorText.Font = Enum.Font.Code
+	inspectorText.TextSize = 14
+	inspectorText.TextColor3 = Color3.fromRGB(200, 230, 255)
+	inspectorText.TextXAlignment = Enum.TextXAlignment.Left
+	inspectorText.TextYAlignment = Enum.TextYAlignment.Top
+	inspectorText.TextWrapped = true
+	inspectorText.Text = ""
+	inspectorText.Parent = inspectorScroll
+
+	task.spawn(function()
+		while true do
+			task.wait(0.7)
+			if inspectorFrame.Visible then
+				local result = invoke("inspect", targetPayload())
+				if typeof(result) == "table" and typeof(result.Lines) == "table" then
+					inspectorText.Text = table.concat(result.Lines, "\n")
+				end
+			end
+		end
+	end)
+
+	-- ── Diagnose-Tool 2: Zonen-Visualisierung (client-lokal, rein lesend) ──
+	local zoneFolder: Folder? = nil
+
+	local function addOverlayBox(folder: Folder, cf: CFrame, size: Vector3, color: Color3, labelText: string?): Part
+		local box = Instance.new("Part")
+		box.Anchored = true
+		box.CanCollide = false
+		box.CanQuery = false
+		box.CanTouch = false
+		box.Transparency = 0.72
+		box.Color = color
+		box.Material = Enum.Material.SmoothPlastic
+		box.Size = size
+		box.CFrame = cf
+		if labelText then
+			local billboard = Instance.new("BillboardGui")
+			billboard.Size = UDim2.fromOffset(180, 22)
+			billboard.StudsOffsetWorldSpace = Vector3.new(0, size.Y / 2 + 1, 0)
+			billboard.AlwaysOnTop = true
+			billboard.MaxDistance = 200
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundTransparency = 1
+			label.Text = labelText
+			label.TextScaled = true
+			label.Font = FONT
+			label.TextColor3 = color
+			label.TextStrokeTransparency = 0.2
+			label.Parent = billboard
+			billboard.Parent = box
+		end
+		box.Parent = folder
+		return box
+	end
+
+	local function toggleZoneOverlay()
+		if zoneFolder then
+			zoneFolder:Destroy()
+			zoneFolder = nil
+			Ui.Toast("🗺️ Zonen-Anzeige AUS.")
+			return
+		end
+		local folder = Instance.new("Folder")
+		folder.Name = "DebugZoneOverlay"
+		zoneFolder = folder
+
+		-- Basis-Fangzonen (grün)
+		local map = workspace:FindFirstChild("Map")
+		if map then
+			for _, inst in map:GetDescendants() do
+				if inst.Name == "VaultZone" and inst:IsA("BasePart") then
+					local parentName = inst.Parent and inst.Parent.Name or "?"
+					addOverlayBox(folder, inst.CFrame, inst.Size, Color3.fromRGB(80, 220, 120), "VaultZone " .. parentName)
+				end
+			end
+		end
+
+		-- Alle ProximityPrompts: Part orange umranden + Reichweite als Kugel
+		-- (Snacks/Pets ausgenommen – die bewegen sich; das hier ist ein Snapshot)
+		local snacksFolder = workspace:FindFirstChild("Snacks")
+		local petsFolder = workspace:FindFirstChild("Pets")
+		for _, inst in workspace:GetDescendants() do
+			if not inst:IsA("ProximityPrompt") then
+				continue
+			end
+			local parent = inst.Parent
+			if not (parent and parent:IsA("BasePart")) then
+				continue
+			end
+			if snacksFolder and parent:IsDescendantOf(snacksFolder) then
+				continue
+			end
+			if petsFolder and parent:IsDescendantOf(petsFolder) then
+				continue
+			end
+			if parent:IsDescendantOf(folder) then
+				continue
+			end
+			local title = if inst.ObjectText ~= "" then inst.ObjectText else parent.Name
+			addOverlayBox(folder, parent.CFrame, parent.Size + Vector3.new(0.6, 0.6, 0.6), Color3.fromRGB(255, 170, 60), "📍 " .. title)
+			local range = addOverlayBox(folder, parent.CFrame, Vector3.one * inst.MaxActivationDistance * 2, Color3.fromRGB(255, 170, 60))
+			range.Transparency = 0.93
+			range.Shape = Enum.PartType.Ball
+		end
+		folder.Parent = workspace
+		Ui.Toast("🗺️ Zonen-Anzeige AN (Snapshot – nach Map-Änderungen neu togglen).")
+	end
+
+	-- ── Diagnose-Tool 3: Log- & Remote-Panel (rechts) ──
+	local logFrame = makeWindow("🧾 LOGS & REMOTES", Vector2.new(470, 430), Color3.fromRGB(255, 180, 120))
+	logFrame.AnchorPoint = Vector2.new(1, 0.5)
+	logFrame.Position = UDim2.new(1, -12, 0.5, 0)
+	local logScroll = Instance.new("ScrollingFrame")
+	logScroll.Position = UDim2.new(0, 12, 0, 48)
+	logScroll.Size = UDim2.new(1, -24, 1, -60)
+	logScroll.BackgroundTransparency = 1
+	logScroll.BorderSizePixel = 0
+	logScroll.ScrollBarThickness = 6
+	logScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	logScroll.CanvasSize = UDim2.new()
+	logScroll.Parent = logFrame
+	local logText = Instance.new("TextLabel")
+	logText.Size = UDim2.new(1, -8, 0, 0)
+	logText.AutomaticSize = Enum.AutomaticSize.Y
+	logText.BackgroundTransparency = 1
+	logText.Font = Enum.Font.Code
+	logText.TextSize = 13
+	logText.TextColor3 = Color3.fromRGB(255, 220, 190)
+	logText.TextXAlignment = Enum.TextXAlignment.Left
+	logText.TextYAlignment = Enum.TextYAlignment.Top
+	logText.TextWrapped = true
+	logText.Text = ""
+	logText.Parent = logScroll
+
+	-- Server->Client-Events lokal mitschreiben (Sfx ausgenommen – zu laut)
+	local clientRemoteLog: { string } = {}
+	for _, remote in ReplicatedStorage:WaitForChild("Remotes"):GetChildren() do
+		if remote:IsA("RemoteEvent") and remote.Name ~= "Sfx" then
+			remote.OnClientEvent:Connect(function(...)
+				local args = table.pack(...)
+				local parts = {}
+				for i = 1, math.min(args.n, 3) do
+					table.insert(parts, tostring(args[i]))
+				end
+				table.insert(clientRemoteLog, ("[%s] %s: %s"):format(os.date("%H:%M:%S"), remote.Name, table.concat(parts, ", ")))
+				if #clientRemoteLog > 10 then
+					table.remove(clientRemoteLog, 1)
+				end
+			end)
+		end
+	end
+
+	task.spawn(function()
+		while true do
+			task.wait(2)
+			if not logFrame.Visible then
+				continue
+			end
+			local data = invoke("logs")
+			if typeof(data) ~= "table" then
+				continue
+			end
+			local lines = { "── SERVER-WARNUNGEN/-FEHLER (letzte 20) ──" }
+			if typeof(data.Logs) == "table" then
+				if #data.Logs == 0 then
+					table.insert(lines, "(keine – gut so!)")
+				end
+				for _, entry in data.Logs do
+					table.insert(lines, ("[%s %s] %s"):format(entry.Time, entry.Type, entry.Text))
+				end
+			end
+			table.insert(lines, "")
+			table.insert(lines, "── REMOTES Client→Server (letzte 15) ──")
+			if typeof(data.Remotes) == "table" then
+				for _, entry in data.Remotes do
+					table.insert(lines, ("[%s] %s ← %s (%s)"):format(entry.Time, entry.Name, entry.From, entry.Args))
+				end
+			end
+			table.insert(lines, "")
+			table.insert(lines, "── REMOTES Server→Client (lokal, ohne Sfx) ──")
+			for _, line in clientRemoteLog do
+				table.insert(lines, line)
+			end
+			logText.Text = table.concat(lines, "\n")
+		end
+	end)
+
+	-- ── Diagnose-Tool 4: Performance-HUD (FPS/Ping/Server-RAM) ──
+	local perfFrame = Instance.new("Frame")
+	perfFrame.Name = "PerfHud"
+	perfFrame.AnchorPoint = Vector2.new(1, 1)
+	perfFrame.Position = UDim2.new(1, -12, 1, -66)
+	perfFrame.Size = UDim2.fromOffset(190, 74)
+	perfFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+	perfFrame.BackgroundTransparency = 0.25
+	perfFrame.Visible = false
+	roundify(perfFrame, 10)
+	perfFrame.Parent = gui
+	local perfLabel = makeLabel(perfFrame, {
+		Position = UDim2.fromOffset(8, 4),
+		Size = UDim2.new(1, -16, 1, -8),
+		Text = "📈 ...",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextScaled = false,
+		TextSize = 14,
+	})
+
+	local serverMemoryMb = 0
+	task.spawn(function()
+		while true do
+			task.wait(3)
+			if perfFrame.Visible then
+				local data = invoke("logs")
+				if typeof(data) == "table" and typeof(data.MemoryMb) == "number" then
+					serverMemoryMb = data.MemoryMb
+				end
+			end
+		end
+	end)
+	local frameCount = 0
+	local fpsWindowStart = os.clock()
+	RunService.RenderStepped:Connect(function()
+		if not perfFrame.Visible then
+			return
+		end
+		frameCount += 1
+		local now = os.clock()
+		if now - fpsWindowStart >= 1 then
+			local fps = frameCount / (now - fpsWindowStart)
+			frameCount = 0
+			fpsWindowStart = now
+			local ping = math.floor(player:GetNetworkPing() * 1000)
+			perfLabel.Text = ("📈 FPS: %d\n📡 Ping: %d ms\n💾 Server-RAM: %d MB"):format(fps, ping, serverMemoryMb)
+		end
+	end)
+
+	-- Lokale Diagnose-Zeilen (erscheinen NUR im Diagnose-Tab)
+	local localTools = {
+		{ Label = "📋 State-Inspector ein/aus (zeigt das ZIEL)", Action = function()
+			inspectorFrame.Visible = not inspectorFrame.Visible
+		end },
+		{ Label = "🗺️ Trigger-Zonen einblenden/ausblenden", Action = toggleZoneOverlay },
+		{ Label = "🧾 Log- & Remote-Panel ein/aus", Action = function()
+			logFrame.Visible = not logFrame.Visible
+		end },
+		{ Label = "📈 Performance-HUD ein/aus (FPS/Ping/RAM)", Action = function()
+			perfFrame.Visible = not perfFrame.Visible
+		end },
+	}
+
+	-- ── Zeilen im aktiven Tab (nach Suchtext gefiltert) ──
+	local function makeRow(order: number, labelText: string, danger: boolean, argDefault: number?, onRun: (value: number?) -> ())
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 40)
+		row.BackgroundTransparency = 1
+		row.LayoutOrder = order
+		row.Parent = list
+
+		local argBox: TextBox? = nil
+		if argDefault ~= nil then
+			local box = Instance.new("TextBox")
+			box.AnchorPoint = Vector2.new(1, 0.5)
+			box.Position = UDim2.new(1, 0, 0.5, 0)
+			box.Size = UDim2.fromOffset(96, 36)
+			box.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+			box.Font = FONT
+			box.TextSize = 16
+			box.TextColor3 = Color3.new(1, 1, 1)
+			box.Text = tostring(argDefault)
+			box.ClearTextOnFocus = false
+			roundify(box, 8)
+			box.Parent = row
+			argBox = box
+		end
+
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, if argBox then -104 else 0, 1, 0)
+		button.BackgroundColor3 = if danger then Color3.fromRGB(150, 55, 60) else Color3.fromRGB(70, 60, 90)
+		button.Font = FONT
+		button.TextScaled = true
+		button.Text = (if danger then "⚠️ " else "") .. labelText
+		button.TextColor3 = Color3.new(1, 1, 1)
+		roundify(button, 8)
+		button.Parent = row
+		button.Activated:Connect(function()
+			onRun(if argBox then tonumber(argBox.Text) else nil)
+		end)
+	end
+
+	rebuildRows = function()
+		for _, child in list:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		for name, button in tabButtons do
+			button.BackgroundColor3 = if name == activeTab then Color3.fromRGB(180, 60, 65) else Color3.fromRGB(55, 48, 70)
+		end
+
+		local filter = searchBox.Text:lower()
+		local function matches(label: string): boolean
+			return filter == "" or label:lower():find(filter, 1, true) ~= nil
+		end
+
+		local order = 0
+		if activeTab == "Diagnose" then
+			for _, tool in localTools do
+				if matches(tool.Label) then
+					order += 1
+					makeRow(order, tool.Label, false, nil, tool.Action)
+				end
+			end
+		end
+		for _, cmd in commandsCache do
+			if cmd.Category == activeTab and matches(cmd.Label) then
+				order += 1
+				makeRow(order, cmd.Label, cmd.Danger == true, cmd.Arg and cmd.Arg.Default, function(value)
+					local function run()
+						task.spawn(function()
+							local result = invoke(cmd.Id, targetPayload({ Value = value }))
+							if typeof(result) == "table" and result.msg then
+								Ui.Toast((result.ok and "🐞 " or "❌ ") .. result.msg)
+							end
+						end)
+					end
+					if cmd.Danger then
+						confirmThen(cmd.Label, run)
+					else
+						run()
+					end
+				end)
+			end
+		end
+	end
+	searchBox:GetPropertyChangedSignal("Text"):Connect(rebuildRows)
+
+	-- Command-Liste (neu) vom Server holen – bei jedem Öffnen, damit die
+	-- dynamischen Teleport-Ziele (Basis-Besitzer!) aktuell sind
+	local function refreshCommands()
+		task.spawn(function()
+			local result = invoke("list")
+			if typeof(result) == "table" and typeof(result.Commands) == "table" then
+				commandsCache = result.Commands
+			end
+			rebuildRows()
+		end)
+	end
+
+	-- ── Toggle-Button + F4 ──
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "DebugToggle"
 	toggle.AnchorPoint = Vector2.new(0, 1)
 	toggle.Position = UDim2.new(0, 12, 1, -12)
-	toggle.Size = UDim2.fromOffset(110, 40)
+	toggle.Size = UDim2.fromOffset(130, 40)
 	toggle.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	toggle.Font = FONT
 	toggle.TextScaled = true
-	toggle.Text = "🐞 DEBUG"
+	toggle.Text = "🐞 DEBUG [F4]"
 	toggle.TextColor3 = Color3.new(1, 1, 1)
 	roundify(toggle, 12)
 	toggle.Parent = gui
 
-	local panel = makeWindow("🐞 DEBUG-MENÜ", Vector2.new(320, 140), Color3.fromRGB(255, 120, 120))
-
-	local list = Instance.new("Frame")
-	list.Position = UDim2.new(0, 12, 0, 48)
-	list.Size = UDim2.new(1, -24, 1, -60)
-	list.BackgroundTransparency = 1
-	list.Parent = panel
-	local layout = Instance.new("UIListLayout")
-	layout.Padding = UDim.new(0, 6)
-	layout.Parent = list
-
-	-- Buttons vom Server generieren lassen
-	task.spawn(function()
-		local ok, commands = pcall(function()
-			return debugRemote:InvokeServer("list")
-		end)
-		if not ok or typeof(commands) ~= "table" then
-			return
-		end
-		panel.Size = UDim2.fromOffset(320, 72 + #commands * 46)
-		for _, cmd in commands do
-			local button = Instance.new("TextButton")
-			button.Size = UDim2.new(1, 0, 0, 40)
-			button.BackgroundColor3 = Color3.fromRGB(70, 60, 90)
-			button.Font = FONT
-			button.TextScaled = true
-			button.Text = cmd.Label
-			button.TextColor3 = Color3.new(1, 1, 1)
-			roundify(button, 10)
-			button.Parent = list
-
-			button.Activated:Connect(function()
-				task.spawn(function()
-					local callOk, result = pcall(function()
-						return debugRemote:InvokeServer(cmd.Id)
-					end)
-					if callOk and typeof(result) == "table" then
-						Ui.Toast((result.ok and "🐞 " or "❌ ") .. result.msg)
-					end
-				end)
-			end)
-		end
-	end)
-
-	toggle.Activated:Connect(function()
+	local function togglePanel()
 		panel.Visible = not panel.Visible
+		if panel.Visible then
+			refreshTargetButton()
+			refreshCommands()
+		end
+	end
+	toggle.Activated:Connect(togglePanel)
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if not gameProcessed and input.KeyCode == Enum.KeyCode.F4 then
+			togglePanel()
+		end
 	end)
+
+	refreshCommands()
 end
 
 -- ══════════ Season-Pass ══════════
@@ -1766,7 +2070,7 @@ end
 
 -- ══════════ Achievements ══════════
 -- Popup beim Freischalten (kommt vom AchievementUnlocked-Remote) + Trophäen-
--- Fenster mit allen Meilensteinen. Freigeschaltet-Status via GetAchievements.
+-- Fenster mit Stats & Freischaltungen vom Server (GetAchievements).
 
 local achievementQueue: { { Name: string, Desc: string } } = {}
 local achievementShowing = false
@@ -1837,21 +2141,20 @@ function Ui.AchievementPopup(name: string, desc: string)
 end
 
 local function buildAchievements()
-	-- Button rechts, unter dem Season-Pass-Knopf
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "AchievementToggle"
 	toggle.AnchorPoint = Vector2.new(1, 0)
-	toggle.Position = UDim2.new(1, -12, 0, 116)
+	toggle.Position = UDim2.new(1, -12, 0, 116) -- unter Hilfe (12) und Pass (64)
 	toggle.Size = UDim2.fromOffset(44, 44)
-	toggle.BackgroundColor3 = Color3.fromRGB(180, 150, 40)
+	toggle.BackgroundColor3 = Color3.fromRGB(200, 170, 60)
 	toggle.Font = FONT
 	toggle.TextScaled = true
-	toggle.Text = "🏆"
+	toggle.Text = "🏅"
 	toggle.TextColor3 = Color3.new(1, 1, 1)
 	roundify(toggle, 12)
 	toggle.Parent = gui
 
-	local frame = makeWindow("🏆 ACHIEVEMENTS", Vector2.new(470, 500), Color3.fromRGB(255, 215, 0))
+	local frame = makeWindow("🏅 ACHIEVEMENTS", Vector2.new(460, 520), Color3.fromRGB(255, 215, 0))
 
 	local list = Instance.new("ScrollingFrame")
 	list.Position = UDim2.new(0, 12, 0, 48)
@@ -1867,58 +2170,63 @@ local function buildAchievements()
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
 	layout.Parent = list
 
-	-- Eine Zeile pro Meilenstein; refresh() färbt anhand des Server-Stands
-	local rows: { [string]: { Row: Frame, Name: TextLabel, Desc: TextLabel } } = {}
+	-- Eine Zeile pro Achievement, Fortschritt/Häkchen füllt refresh()
+	local rows: { [string]: { Row: Frame, Name: TextLabel, Progress: TextLabel } } = {}
 	for i, def in Config.Achievements do
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, -8, 0, 52)
-		row.BackgroundColor3 = Color3.fromRGB(40, 36, 50)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
 		row.LayoutOrder = i
 		roundify(row, 10)
 		row.Parent = list
 
 		local nameLabel = makeLabel(row, {
 			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -20, 0, 26),
+			Size = UDim2.new(1, -110, 0, 24),
 			TextXAlignment = Enum.TextXAlignment.Left,
-			Text = "🔒 " .. def.Name,
-			TextColor3 = Color3.fromRGB(150, 145, 165),
+			Text = def.Name,
 		})
-		local descLabel = makeLabel(row, {
-			Position = UDim2.fromOffset(10, 32),
-			Size = UDim2.new(1, -20, 0, 16),
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 30),
+			Size = UDim2.new(1, -110, 0, 16),
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Text = def.Desc,
 			TextColor3 = Color3.fromRGB(190, 190, 200),
 			TextScaled = false,
 			TextSize = 13,
 		})
-		rows[def.Id] = { Row = row, Name = nameLabel, Desc = descLabel }
+		local progress = makeLabel(row, {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10, 0.5, 0),
+			Size = UDim2.fromOffset(90, 30),
+			Text = "…",
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+		})
+		rows[def.Id] = { Row = row, Name = nameLabel, Progress = progress }
 	end
 
 	local function refresh()
 		task.spawn(function()
-			local ok, unlocked = pcall(function()
+			local ok, data = pcall(function()
 				return (Remotes.Get("GetAchievements") :: RemoteFunction):InvokeServer()
 			end)
-			if not ok or typeof(unlocked) ~= "table" then
+			if not ok or typeof(data) ~= "table" then
 				return
 			end
-			local count = 0
 			for _, def in Config.Achievements do
 				local refs = rows[def.Id]
-				if unlocked[def.Id] then
-					count += 1
-					refs.Row.BackgroundColor3 = Color3.fromRGB(55, 60, 40)
-					refs.Name.Text = "✅ " .. def.Name
-					refs.Name.TextColor3 = Color3.fromRGB(255, 215, 0)
-				else
-					refs.Row.BackgroundColor3 = Color3.fromRGB(40, 36, 50)
-					refs.Name.Text = "🔒 " .. def.Name
-					refs.Name.TextColor3 = Color3.fromRGB(150, 145, 165)
+				if not refs then
+					continue
 				end
+				local unlocked = data.Unlocked and data.Unlocked[def.Id] == true
+				local value = math.min(data.Stats and data.Stats[def.Stat] or 0, def.Goal)
+				refs.Row.BackgroundColor3 = if unlocked then Color3.fromRGB(45, 70, 50) else Color3.fromRGB(55, 48, 70)
+				refs.Progress.Text = if unlocked then "✅" else ("%d/%d"):format(value, def.Goal)
+				refs.Progress.TextColor3 = if unlocked
+					then Color3.fromRGB(140, 230, 160)
+					else Color3.fromRGB(190, 190, 200)
 			end
-			toggle.Text = count >= #Config.Achievements and "👑" or "🏆"
 		end)
 	end
 
@@ -1930,17 +2238,17 @@ local function buildAchievements()
 	end)
 end
 
--- ══════════ Referral / Freunde einladen ══════════
--- Zeigt den eigenen Code, die Erfolgs-Statistik und ein Eingabefeld zum
--- Einlösen. Alles Server-validiert (GetReferralInfo / RedeemReferral).
+-- ══════════ Referral/Einladungen ══════════
+-- Zeigt den eigenen Code + Erfolgs-Zähler und lässt NEUE Spieler einen
+-- fremden Code einlösen. Alles Weitere validiert der ReferralService.
 
 local function buildReferral()
 	local toggle = Instance.new("TextButton")
 	toggle.Name = "ReferralToggle"
 	toggle.AnchorPoint = Vector2.new(1, 0)
-	toggle.Position = UDim2.new(1, -12, 0, 168)
+	toggle.Position = UDim2.new(1, -12, 0, 168) -- unter Hilfe/Pass/Achievements
 	toggle.Size = UDim2.fromOffset(44, 44)
-	toggle.BackgroundColor3 = Color3.fromRGB(70, 160, 220)
+	toggle.BackgroundColor3 = Color3.fromRGB(80, 180, 200)
 	toggle.Font = FONT
 	toggle.TextScaled = true
 	toggle.Text = "👥"
@@ -1948,82 +2256,59 @@ local function buildReferral()
 	roundify(toggle, 12)
 	toggle.Parent = gui
 
-	local frame = makeWindow("👥 FREUNDE EINLADEN", Vector2.new(440, 330), Color3.fromRGB(120, 200, 255))
+	local frame = makeWindow("👥 FREUNDE EINLADEN", Vector2.new(440, 330), Color3.fromRGB(120, 220, 240))
 
 	makeLabel(frame, {
 		Position = UDim2.fromOffset(16, 44),
-		Size = UDim2.new(1, -32, 0, 20),
-		Text = "DEIN CODE (Freunden schicken!):",
-		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, -32, 0, 40),
+		Text = ("Lade Freunde ein! Schafft dein Freund Rebirth 1,\nkriegst DU %s💰 + ein Gratis-Gold-Ei!"):format(
+			formatNumber(Config.ReferralRewardCash)
+		),
 		TextColor3 = Color3.fromRGB(190, 190, 200),
 		TextScaled = false,
-		TextSize = 14,
+		TextSize = 15,
+		TextWrapped = true,
 	})
 
-	-- Code als TextBox (readonly-ish): auf Roblox kann man daraus kopieren
+	-- Eigener Code (groß, zum Abtippen/Weitersagen)
 	local codeBox = Instance.new("TextBox")
-	codeBox.Position = UDim2.fromOffset(16, 66)
-	codeBox.Size = UDim2.new(1, -32, 0, 42)
+	codeBox.Position = UDim2.new(0, 16, 0, 94)
+	codeBox.Size = UDim2.new(1, -32, 0, 44)
 	codeBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	codeBox.Font = FONT
 	codeBox.TextScaled = true
 	codeBox.TextColor3 = Color3.fromRGB(255, 215, 0)
-	codeBox.Text = "..."
-	codeBox.TextEditable = false
+	codeBox.Text = "…"
+	codeBox.TextEditable = false -- nur zum Markieren/Kopieren, nicht editierbar
 	codeBox.ClearTextOnFocus = false
 	roundify(codeBox, 10)
 	codeBox.Parent = frame
 
 	local statsLabel = makeLabel(frame, {
-		Position = UDim2.fromOffset(16, 116),
+		Position = UDim2.fromOffset(16, 144),
 		Size = UDim2.new(1, -32, 0, 24),
 		Text = "",
-		TextXAlignment = Enum.TextXAlignment.Left,
 		TextColor3 = Color3.fromRGB(140, 230, 160),
 	})
 
-	makeLabel(frame, {
-		Position = UDim2.fromOffset(16, 144),
-		Size = UDim2.new(1, -32, 0, 36),
-		Text = ("Schafft dein eingeladener Freund Rebirth %d, kassierst DU %s💰 + ein Gold-Ei!"):format(
-			Config.Referral.MilestoneRebirths,
-			formatNumber(Config.Referral.RewardCash)
-		),
-		TextColor3 = Color3.fromRGB(230, 225, 245),
-		TextScaled = false,
-		TextSize = 14,
-		TextWrapped = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
-	})
-
-	-- ── Fremden Code einlösen ──
-	local redeemLabel = makeLabel(frame, {
-		Position = UDim2.fromOffset(16, 192),
-		Size = UDim2.new(1, -32, 0, 20),
-		Text = "WURDEST DU EINGELADEN? Code hier rein:",
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextColor3 = Color3.fromRGB(190, 190, 200),
-		TextScaled = false,
-		TextSize = 14,
-	})
-
-	local inputBox = Instance.new("TextBox")
-	inputBox.Position = UDim2.fromOffset(16, 214)
-	inputBox.Size = UDim2.new(1, -160, 0, 40)
-	inputBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	inputBox.Font = FONT
-	inputBox.TextScaled = true
-	inputBox.TextColor3 = Color3.new(1, 1, 1)
-	inputBox.PlaceholderText = "YEET-12345"
-	inputBox.Text = ""
-	inputBox.ClearTextOnFocus = false
-	roundify(inputBox, 10)
-	inputBox.Parent = frame
+	-- Einlöse-Bereich (nur sichtbar, solange man selbst noch einlösen darf)
+	local redeemBox = Instance.new("TextBox")
+	redeemBox.Position = UDim2.new(0, 16, 0, 186)
+	redeemBox.Size = UDim2.new(1, -152, 0, 40)
+	redeemBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	redeemBox.Font = FONT
+	redeemBox.TextSize = 18
+	redeemBox.TextColor3 = Color3.new(1, 1, 1)
+	redeemBox.PlaceholderText = "Code vom Freund, z.B. " .. Config.ReferralCodePrefix .. "12345"
+	redeemBox.Text = ""
+	redeemBox.ClearTextOnFocus = false
+	roundify(redeemBox, 10)
+	redeemBox.Parent = frame
 
 	local redeemButton = Instance.new("TextButton")
 	redeemButton.AnchorPoint = Vector2.new(1, 0)
-	redeemButton.Position = UDim2.new(1, -16, 0, 214)
-	redeemButton.Size = UDim2.fromOffset(120, 40)
+	redeemButton.Position = UDim2.new(1, -16, 0, 186)
+	redeemButton.Size = UDim2.fromOffset(112, 40)
 	redeemButton.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
 	redeemButton.Font = FONT
 	redeemButton.TextScaled = true
@@ -2032,15 +2317,14 @@ local function buildReferral()
 	roundify(redeemButton, 10)
 	redeemButton.Parent = frame
 
-	local statusLabel = makeLabel(frame, {
-		Position = UDim2.fromOffset(16, 262),
-		Size = UDim2.new(1, -32, 0, 40),
+	local redeemHint = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 232),
+		Size = UDim2.new(1, -32, 0, 60),
 		Text = "",
 		TextColor3 = Color3.fromRGB(190, 190, 200),
 		TextScaled = false,
 		TextSize = 14,
 		TextWrapped = true,
-		TextXAlignment = Enum.TextXAlignment.Left,
 	})
 
 	local function refresh()
@@ -2052,24 +2336,23 @@ local function buildReferral()
 				return
 			end
 			codeBox.Text = info.Code or "?"
-			statsLabel.Text = ("🎉 Erfolgreich eingeladen: %d Freund(e)"):format(info.Invited or 0)
+			statsLabel.Text = ("🤝 Erfolgreich eingeladen: %d"):format(info.SuccessCount or 0)
 			local canRedeem = info.CanRedeem == true
-			inputBox.Visible = canRedeem
+			redeemBox.Visible = canRedeem
 			redeemButton.Visible = canRedeem
-			redeemLabel.Visible = canRedeem
-			if info.ReferredBy and info.ReferredBy ~= 0 then
-				statusLabel.Text = "🤝 Du wurdest bereits eingeladen – schaff deinen Rebirth für deinen Einlader!"
-			elseif not canRedeem then
-				statusLabel.Text = "ℹ️ Codes können nur NEUE Spieler (vor dem ersten Rebirth) einlösen."
+			if canRedeem then
+				redeemHint.Text = "Hat DICH jemand eingeladen? Löse seinen Code ein (geht nur vor deinem ersten Rebirth)!"
+			elseif (info.InvitedBy or 0) > 0 then
+				redeemHint.Text = "✅ Du bist schon mit deinem Einlader verknüpft – schaff Rebirth 1 für seine Prämie!"
 			else
-				statusLabel.Text = ""
+				redeemHint.Text = "Einlösen geht nur für neue Spieler (vor dem ersten Rebirth)."
 			end
 		end)
 	end
 
 	redeemButton.Activated:Connect(function()
-		local code = inputBox.Text
-		if code == "" then
+		local code = redeemBox.Text
+		if code:gsub("%s", "") == "" then
 			Ui.Toast("❌ Erst einen Code eintippen!")
 			return
 		end
@@ -2079,13 +2362,167 @@ local function buildReferral()
 			end)
 			if ok and typeof(result) == "table" then
 				Ui.Toast((result.ok and "🤝 " or "❌ ") .. result.msg)
-				if result.ok then
-					inputBox.Text = ""
-				end
 			end
 			refresh()
 		end)
 	end)
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
+-- ══════════ Basis-Deko (Housing) ══════════
+-- Kaufen + Aufstellen/Entfernen von Deko-Objekten für die eigene Basis.
+-- Besitz/Slots kommen per GetHousing vom Server; validiert wird dort.
+
+local function buildHousing()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "HousingToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 220) -- unter Hilfe/Pass/Achievements/Referral
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(120, 200, 120)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🏡"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🏡 BASIS-DEKO", Vector2.new(460, 520), Color3.fromRGB(150, 230, 150))
+
+	local slotLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 22),
+		Text = "",
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 15,
+	})
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 70)
+	list.Size = UDim2.new(1, -24, 1, -82)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 6)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	local housingCache: any = { Owned = {}, Slots = {}, HasBase = false, SlotCount = #Config.HousingSlotOffsets }
+	local decorRows: { [string]: TextButton } = {}
+	local refresh: () -> ()
+
+	for i, def in Config.HousingDecor do
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 54)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = i
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Name,
+			TextColor3 = def.Color or Color3.new(1, 1, 1),
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -140, 0, 16),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = def.Desc or "",
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+		})
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 38)
+		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = formatNumber(def.Cost) .. "💰"
+		roundify(button, 10)
+		button.Parent = row
+		decorRows[def.Id] = button
+
+		button.Activated:Connect(function()
+			task.spawn(function()
+				-- Aktion aus dem Cache ableiten: kaufen -> aufstellen -> entfernen
+				local owned = housingCache.Owned and housingCache.Owned[def.Id] == true
+				local placed = housingCache.Slots and table.find(housingCache.Slots, def.Id) ~= nil
+				local ok, result
+				if not owned then
+					ok, result = pcall(function()
+						return (Remotes.Get("BuyDecor") :: RemoteFunction):InvokeServer(def.Id)
+					end)
+				else
+					ok, result = pcall(function()
+						return (Remotes.Get("PlaceDecor") :: RemoteFunction):InvokeServer(def.Id, not placed)
+					end)
+				end
+				if ok and typeof(result) == "table" then
+					Ui.Toast((result.ok and "🏡 " or "❌ ") .. result.msg)
+				end
+				refresh()
+			end)
+		end)
+	end
+
+	refresh = function()
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return (Remotes.Get("GetHousing") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(data) ~= "table" then
+				return
+			end
+			housingCache = data
+
+			local placedCount = 0
+			for _, decorId in data.Slots or {} do
+				if decorId ~= "" then
+					placedCount += 1
+				end
+			end
+			slotLabel.Text = if data.HasBase
+				then ("Deko-Plätze an deiner Basis: %d/%d belegt"):format(placedCount, data.SlotCount or 0)
+				else "⚠️ Erst eine Basis beanspruchen – dann wird hier dekoriert!"
+
+			for _, def in Config.HousingDecor do
+				local button = decorRows[def.Id]
+				if not button then
+					continue
+				end
+				local owned = data.Owned and data.Owned[def.Id] == true
+				local placed = data.Slots and table.find(data.Slots, def.Id) ~= nil
+				if placed then
+					button.Text = "ENTFERNEN"
+					button.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+				elseif owned then
+					button.Text = "AUFSTELLEN"
+					button.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				else
+					button.Text = formatNumber(def.Cost) .. "💰"
+					button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+				end
+			end
+		end)
+	end
 
 	toggle.Activated:Connect(function()
 		frame.Visible = not frame.Visible
@@ -2149,7 +2586,7 @@ local function buildHelp()
 		"🏆 ACHIEVEMENTS (Pokal-Button): Meilensteine sammeln!",
 		"🤝 Mit Roblox-FREUNDEN im Server spielen = +10% Einkommen!",
 		"👥 FREUNDE EINLADEN (Button rechts): Code teilen = fette Belohnung!",
-		"🏡 PINKES PAD an deiner Basis = Deko kaufen & aufstellen!",
+		"🏡 BASIS-DEKO (Button rechts): Deko kaufen & aufstellen!",
 	}, "\n")
 
 	local body = Instance.new("TextLabel")
@@ -2234,13 +2671,13 @@ function Ui.Build()
 		},
 	})
 	buildMergeUi()
-	buildHousing()
 	buildSupremeBar()
 	buildFriendBonus()
 	buildChargeBar()
 	buildSeasonPass()
 	buildAchievements()
 	buildReferral()
+	buildHousing()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

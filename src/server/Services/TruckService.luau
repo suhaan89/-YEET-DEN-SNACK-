@@ -221,6 +221,37 @@ function TruckService.DebugTruckNow()
 	end)
 end
 
+-- Debug-Hook: Rush Hour sofort (zwei Trucks aus beiden Richtungen)
+function TruckService.DebugRushHourNow()
+	task.spawn(function()
+		announceRemote:FireAllClients("🚚🚚 DOPPELTES SNACK-CHAOS!!!", "Legendary")
+		task.spawn(runTruck, -1)
+		task.wait(1.5)
+		runTruck(1)
+	end)
+end
+
+-- Debug-Hook: Warte-Timer der Event-Schleife überspringen (nächster Truck kommt sofort)
+local skipTimer = false
+function TruckService.DebugSkipTimer()
+	skipTimer = true
+end
+
+-- Debug-Hook: Supreme-Countdown auf 0 -> der NÄCHSTE reguläre Truck ist der Mutanten-Express
+function TruckService.DebugSupremeNext()
+	supremeLeft = 0
+	workspace:SetAttribute("SupremeTrucksLeft", supremeLeft)
+end
+
+-- task.wait, das sich per DebugSkipTimer abkürzen lässt (nur für die Event-Schleife)
+local function waitSkippable(seconds: number)
+	local deadline = os.clock() + seconds
+	while os.clock() < deadline and not skipTimer do
+		task.wait(0.25)
+	end
+	skipTimer = false
+end
+
 function TruckService.Init(services)
 	SnackService = services.SnackService
 	Ragdoll = services.Ragdoll
@@ -230,7 +261,7 @@ function TruckService.Init(services)
 	rollSupremeCountdown()
 
 	task.spawn(function()
-		task.wait(Config.TruckFirstSpawnDelay)
+		waitSkippable(Config.TruckFirstSpawnDelay)
 		local dirFlip = false
 		while true do
 			truckCounter += 1
@@ -271,7 +302,7 @@ function TruckService.Init(services)
 				workspace:SetAttribute("SupremeTrucksLeft", supremeLeft)
 			end
 
-			task.wait(Config.TruckInterval)
+			waitSkippable(Config.TruckInterval)
 		end
 	end)
 end

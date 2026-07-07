@@ -1,18 +1,16 @@
 --[[
 	GoldenSnackService.luau
-	Zufalls-Minievent: Der GOLDENE SNACK!
-	- Spawnt alle Config.GoldenSnack.IntervalMin..Max Sekunden an einer
-	  zufälligen Stelle der begehbaren Map (unabhängig vom Truck-Timer)
-	- Leuchtet weithin sichtbar (Neon + Lichtsäule + Sparkles + Licht)
-	- Wer ihn ZUERST berührt, bekommt Cash (mal Rebirth-Multiplikator) + Season-XP
-	- Claim ist server-autoritativ: ein `claimed`-Flag verhindert Doppel-Vergabe,
-	  auch wenn zwei Spieler im selben Frame reinlaufen (Touched feuert seriell,
-	  das Flag kippt beim ersten gültigen Treffer)
-	- Nach Config.GoldenSnack.Lifetime Sekunden verschwindet er unberührt
+	Zufalls-Minievent: Alle paar Minuten (unabhängig vom Truck-Timer!) spawnt
+	irgendwo auf der begehbaren Map ein GOLDENER SNACK mit dicker Leuchtsäule.
+	Wer ihn ZUERST berührt oder per [E] schnappt, bekommt einen Cash-Bonus
+	(skaliert mit dem Rebirth-Multiplikator) + Season-Pass-XP.
+
+	Server-autoritativ:
+	- Vergabe passiert genau EINMAL (claimed-Flag, first come first serve –
+	  Luau-Callbacks laufen kooperativ, das Flag reicht als Schutz).
+	- Reward-Höhe kommt aus Config, der Client kriegt nur Announce/Notify.
 ]]
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -21,7 +19,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local GoldenSnackService = {}
 
 local DataService, PlayerService, SeasonPassService -- in Init verdrahtet
-local servicesRef -- für optionale Hooks (z.B. AchievementService)
+local servicesRef -- für optionale Hooks (AchievementService)
 
 local announceRemote: RemoteEvent
 local notifyRemote: RemoteEvent
@@ -29,207 +27,164 @@ local sfxRemote: RemoteEvent
 
 local GOLD = Color3.fromRGB(255, 215, 0)
 
--- Grobe Himmelsrichtung für die Ankündigung ("wo ungefähr suchen?")
-local function directionHint(position: Vector3): string
-	local hints = {}
-	if position.Z < -60 then
-		table.insert(hints, "im NORDEN")
-	elseif position.Z > 60 then
-		table.insert(hints, "im SÜDEN")
-	end
-	if position.X < -100 then
-		table.insert(hints, "im WESTEN")
-	elseif position.X > 100 then
-		table.insert(hints, "im OSTEN")
-	end
-	if #hints == 0 then
-		return "bei der PLAZA"
-	end
-	return table.concat(hints, " und ")
-end
-
--- Zufällige Boden-Position im Spawn-Bereich (Raycast von oben, damit der
--- Snack auch auf Basen/Plaza/Straße sauber aufliegt)
+-- Zufällige Spawn-Position im Config-Rechteck; per Raycast auf den Boden gesetzt
 local function rollSpawnPosition(): Vector3
-	local cfg = Config.GoldenSnack
-	local x = math.random(-cfg.SpawnAreaX, cfg.SpawnAreaX)
-	local z = math.random(-cfg.SpawnAreaZ, cfg.SpawnAreaZ)
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	local exclude: { Instance } = {}
-	local snacks = workspace:FindFirstChild("Snacks")
-	if snacks then
-		table.insert(exclude, snacks)
-	end
-	params.FilterDescendantsInstances = exclude
-	local result = workspace:Raycast(Vector3.new(x, 60, z), Vector3.new(0, -100, 0), params)
-	local groundY = result and result.Position.Y or 0.5
-	return Vector3.new(x, groundY + 2.5, z)
+	local area = Config.GoldenSnackArea
+	local x = math.random(area.MinX, area.MaxX)
+	local z = math.random(area.MinZ, area.MaxZ)
+	local result = workspace:Raycast(Vector3.new(x, 60, z), Vector3.new(0, -100, 0))
+	local y = result and result.Position.Y or 1
+	return Vector3.new(x, y + 2, z)
 end
 
--- Baut das leuchtende Gold-Objekt samt Lichtsäule
-local function buildGoldenSnack(position: Vector3): (Part, Part)
+-- Baut den goldenen Snack samt Leuchtsäule; gibt (part, aufräumen) zurück
+local function buildGoldenSnack(position: Vector3): (BasePart, () -> ())
 	local part = Instance.new("Part")
 	part.Name = "GoldenSnack"
 	part.Shape = Enum.PartType.Ball
-	part.Size = Vector3.new(3, 3, 3)
+	part.Size = Vector3.new(2.5, 2.5, 2.5)
 	part.Color = GOLD
 	part.Material = Enum.Material.Neon
 	part.Anchored = true
-	part.CanCollide = false -- Spieler laufen durch -> Touched feuert trotzdem
+	part.CanCollide = false
 	part.Position = position
 
-	local light = Instance.new("PointLight")
-	light.Color = GOLD
-	light.Brightness = 4
-	light.Range = 30
-	light.Parent = part
+	-- Leuchtsäule: von überall auf der Map sichtbar (wie die Imperiums-Säule)
+	local pillar = Instance.new("Part")
+	pillar.Name = "GoldenSnackPillar"
+	pillar.Size = Vector3.new(1.6, 80, 1.6)
+	pillar.Color = GOLD
+	pillar.Material = Enum.Material.Neon
+	pillar.Transparency = 0.5
+	pillar.Anchored = true
+	pillar.CanCollide = false
+	pillar.CanQuery = false
+	pillar.CanTouch = false
+	pillar.Position = position + Vector3.new(0, 40, 0)
+	pillar.Parent = workspace
 
 	local sparkles = Instance.new("Sparkles")
 	sparkles.SparkleColor = GOLD
 	sparkles.Parent = part
 
-	local attachment = Instance.new("Attachment")
-	attachment.Parent = part
+	local light = Instance.new("PointLight")
+	light.Color = GOLD
+	light.Brightness = 3
+	light.Range = 30
+	light.Parent = part
+
 	local emitter = Instance.new("ParticleEmitter")
 	emitter.Color = ColorSequence.new(GOLD)
-	emitter.LightEmission = 1
 	emitter.Speed = NumberRange.new(3, 7)
-	emitter.Lifetime = NumberRange.new(0.6, 1.2)
+	emitter.Lifetime = NumberRange.new(0.5, 1.2)
 	emitter.SpreadAngle = Vector2.new(180, 180)
-	emitter.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.5),
-		NumberSequenceKeypoint.new(1, 0),
-	})
+	emitter.Size = NumberSequence.new(0.4)
 	emitter.Rate = 25
-	emitter.Parent = attachment
+	emitter.Parent = part
 
 	local billboard = Instance.new("BillboardGui")
-	billboard.Size = UDim2.fromOffset(240, 34)
-	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
-	billboard.AlwaysOnTop = true
-	billboard.MaxDistance = 500
+	billboard.Size = UDim2.fromOffset(220, 34)
+	billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+	billboard.AlwaysOnTop = false
+	billboard.MaxDistance = 400
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Text = "🌟 GOLDENER SNACK 🌟"
+	label.TextColor3 = GOLD
+	label.TextStrokeTransparency = 0.2
 	label.TextScaled = true
 	label.Font = Enum.Font.FredokaOne
-	label.TextColor3 = GOLD
-	label.TextStrokeTransparency = 0.1
 	label.Parent = billboard
 	billboard.Parent = part
 
-	-- Lichtsäule: von JEDEM Punkt der Map sichtbar
-	local beacon = Instance.new("Part")
-	beacon.Name = "GoldenBeacon"
-	beacon.Size = Vector3.new(2, 120, 2)
-	beacon.Color = GOLD
-	beacon.Material = Enum.Material.Neon
-	beacon.Transparency = 0.55
-	beacon.Anchored = true
-	beacon.CanCollide = false
-	beacon.CanQuery = false
-	beacon.CanTouch = false
-	beacon.Position = position + Vector3.new(0, 60, 0)
-
 	part.Parent = workspace
-	beacon.Parent = workspace
-	return part, beacon
+
+	local function cleanup()
+		part:Destroy()
+		pillar:Destroy()
+	end
+	return part, cleanup
 end
 
--- Ein kompletter Spawn-Zyklus: aufbauen, auf Berührung warten, abräumen
+-- Ein kompletter Event-Durchlauf: spawnen, warten, vergeben ODER despawnen
 local function runGoldenSnack()
 	local position = rollSpawnPosition()
-	local part, beacon = buildGoldenSnack(position)
+	local part, cleanup = buildGoldenSnack(position)
 
-	announceRemote:FireAllClients(
-		("🌟 Ein GOLDENER SNACK ist aufgetaucht – %s! Wer zuerst kommt, kassiert!"):format(directionHint(position)),
-		"Legendary"
-	)
+	announceRemote:FireAllClients("🌟 Ein GOLDENER SNACK ist aufgetaucht! Wer zuerst kommt, kassiert!", "Legendary")
 	sfxRemote:FireAllClients("ding", position)
 
+	-- Genau EINE Vergabe – das Flag schützt gegen gleichzeitigen Touch + Prompt
 	local claimed = false
-	local expired = false
-
-	part.Touched:Connect(function(hit)
-		if claimed or expired then
+	local function tryClaim(player: Player)
+		if claimed or not player.Parent then
 			return
 		end
-		local character = hit.Parent
-		if not character or not character:IsA("Model") then
-			return
-		end
-		local player = Players:GetPlayerFromCharacter(character)
-		if not player then
-			return
-		end
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		local character = player.Character
+		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 		if not humanoid or humanoid.Health <= 0 then
 			return
 		end
-		if not DataService.Get(player) then
-			return -- Daten noch nicht geladen: kein Claim möglich
+		if player:GetAttribute("Snackified") then
+			return -- verwandelte Snacks schnappen keine Snacks 💀
 		end
-		claimed = true -- ab hier gehen alle weiteren Touches leer aus
+		claimed = true
 
-		local amount = math.floor(Config.GoldenSnack.CashBase * DataService.GetMultiplier(player))
-		PlayerService.AddCash(player, amount)
+		local reward = math.floor(Config.GoldenSnackReward * DataService.GetMultiplier(player))
+		PlayerService.AddCash(player, reward)
 		SeasonPassService.AddXp(player, "GoldenSnack")
 
-		-- Optionaler Achievement-Hook (Service kommt aus Teil 2 – defensiv)
+		-- Optionaler Achievement-Hook (Service existiert evtl. noch nicht)
 		local achievements = servicesRef and servicesRef.AchievementService
 		if achievements then
-			achievements.AddStat(player, "Golden", 1)
+			achievements.Track(player, "GoldenSnacks", 1)
 		end
 
-		notifyRemote:FireClient(player, ("🌟 GOLDENER SNACK geschnappt: +%d💰!"):format(amount))
+		sfxRemote:FireAllClients("ding", part.Position)
+		notifyRemote:FireClient(player, ("🌟 GOLDENER SNACK geschnappt: +%d💰!"):format(reward))
 		announceRemote:FireAllClients(
-			("🌟 %s hat den GOLDENEN SNACK geschnappt! (+%d💰)"):format(player.Name, amount),
+			("🌟 %s hat sich den GOLDENEN SNACK geschnappt! (+%d💰)"):format(player.Name, reward),
 			"Legendary"
 		)
-		sfxRemote:FireAllClients("ding", part.Position)
+		cleanup()
+	end
 
-		-- Abschieds-Konfetti, dann weg damit
-		local burst = part:FindFirstChildOfClass("Attachment")
-		local burstEmitter = burst and burst:FindFirstChildOfClass("ParticleEmitter")
-		if burstEmitter then
-			burstEmitter:Emit(60)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Schnappen!"
+	prompt.ObjectText = "Goldener Snack"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 8
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = part
+	prompt.Triggered:Connect(tryClaim)
+
+	part.Touched:Connect(function(hit)
+		local character = hit.Parent
+		local player = character and game:GetService("Players"):GetPlayerFromCharacter(character)
+		if player then
+			tryClaim(player)
 		end
-		part.Transparency = 1
-		local bb = part:FindFirstChildOfClass("BillboardGui")
-		if bb then
-			bb.Enabled = false
-		end
-		beacon:Destroy()
-		task.delay(1.5, function()
-			part:Destroy()
-		end)
 	end)
 
-	-- Schwebe-Animation (dreht sich + hüpft leicht), bis geclaimt/abgelaufen
-	local spin: RBXScriptConnection
-	local baseY = position.Y
-	spin = RunService.Heartbeat:Connect(function()
-		if claimed or expired or not part.Parent then
-			spin:Disconnect()
-			return
+	-- Berührung braucht CanTouch trotz CanCollide=false; langsames Drehen für den Bling-Faktor
+	part.CanTouch = true
+	task.spawn(function()
+		while part.Parent do
+			part.CFrame = part.CFrame * CFrame.Angles(0, math.rad(4), 0)
+			task.wait(0.05)
 		end
-		local t = os.clock()
-		part.CFrame = CFrame.new(position.X, baseY + math.sin(t * 2.5) * 0.6, position.Z) * CFrame.Angles(0, t * 2, 0)
 	end)
 
-	-- Lebenszeit abwarten; wenn niemand ihn geholt hat: leise verschwinden
-	task.wait(Config.GoldenSnack.Lifetime)
+	task.wait(Config.GoldenSnackLifetime)
 	if not claimed then
-		expired = true
-		announceRemote:FireAllClients("💨 Der goldene Snack ist wieder verschwunden... Pech gehabt!", nil)
-		part:Destroy()
-		beacon:Destroy()
+		claimed = true -- Vergabe ab jetzt gesperrt (Race mit letztem Touch)
+		cleanup()
+		announceRemote:FireAllClients("💨 Der goldene Snack ist wieder verschwunden... zu langsam!", nil)
 	end
 end
 
--- Debug-Hook: goldenen Snack SOFORT spawnen (fürs Test-Menü)
+-- Debug-Hook: goldenen Snack sofort spawnen (fürs Test-Menü; unabhängig vom Timer)
 function GoldenSnackService.DebugSpawnNow()
 	task.spawn(runGoldenSnack)
 end
@@ -245,12 +200,10 @@ function GoldenSnackService.Init(services)
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent
 
 	task.spawn(function()
+		task.wait(Config.GoldenSnackFirstDelay)
 		while true do
-			task.wait(math.random(Config.GoldenSnack.IntervalMin, Config.GoldenSnack.IntervalMax))
-			-- Ohne Spieler kein Event (leerer Server soll nicht vor sich hin spawnen)
-			if #Players:GetPlayers() > 0 then
-				runGoldenSnack()
-			end
+			runGoldenSnack()
+			task.wait(math.random(Config.GoldenSnackIntervalMin, Config.GoldenSnackIntervalMax))
 		end
 	end)
 end

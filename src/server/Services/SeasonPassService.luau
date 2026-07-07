@@ -38,7 +38,13 @@ for _, def in Config.SeasonTrails do
 	seasonTrailsById[def.Id] = def
 end
 
+-- Debug-Override fürs Test-Menü: nil = echtes Zeitfenster, true/false = erzwungen
+local debugSeasonOverride: boolean? = nil
+
 local function seasonActive(): boolean
+	if debugSeasonOverride ~= nil then
+		return debugSeasonOverride
+	end
 	local now = os.time()
 	return now >= Config.SeasonPass.StartTime and now <= Config.SeasonPass.EndTime
 end
@@ -157,6 +163,21 @@ function SeasonPassService.DebugAddXp(player: Player, amount: number)
 	profile.SeasonPass.Xp += amount
 	grantPending(player)
 	syncAttributes(player)
+end
+
+-- Season-Zeitfenster simulieren: echt -> BEENDET erzwingen -> AKTIV erzwingen -> echt.
+-- Gibt einen Anzeigetext für den Toast zurück.
+function SeasonPassService.DebugCycleSeasonOverride(): string
+	if debugSeasonOverride == nil then
+		debugSeasonOverride = false
+		return "Season-Override: BEENDET erzwungen (kein XP mehr)."
+	elseif debugSeasonOverride == false then
+		debugSeasonOverride = true
+		return "Season-Override: AKTIV erzwungen (XP läuft, egal was der Kalender sagt)."
+	else
+		debugSeasonOverride = nil
+		return ("Season-Override AUS – echtes Zeitfenster gilt (aktiv: %s)."):format(tostring(seasonActive()))
+	end
 end
 
 function SeasonPassService.DebugTogglePremium(player: Player): boolean

@@ -97,6 +97,23 @@ function DataService.WaitFor(player: Player, timeout: number?)
 	return profiles[player]
 end
 
+-- Debug-Hook: Profil SOFORT speichern (fürs Test-Menü – prüft, ob Speichern
+-- gerade funktioniert, ohne auf Autosave/Shutdown zu warten).
+-- Gibt (ok, Fehlertext) zurück.
+function DataService.ForceSave(player: Player): (boolean, string?)
+	local profile = profiles[player]
+	if not profile then
+		return false, "Kein Profil geladen."
+	end
+	if not store then
+		return false, "Kein DataStore-Zugriff (Studio-API aktivieren!)."
+	end
+	local ok, err = pcall(function()
+		store:SetAsync("Player_" .. player.UserId, profile)
+	end)
+	return ok, if ok then nil else tostring(err)
+end
+
 function DataService.GetMultiplier(player: Player): number
 	local profile = profiles[player]
 	if not profile then

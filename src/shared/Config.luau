@@ -87,69 +87,87 @@ local Config = {
 	PlaytimeGiftInterval = 240, -- alle X Sekunden Spielzeit gibt's einen Geschenk-Snack
 	SpawnProtection = 4, -- Sekunden ForceField nach dem Spawnen
 
-	-- ══ Goldener Snack (Zufalls-Minievent) ══
-	-- Spawnt unabhängig vom Truck-Timer irgendwo auf der Map und leuchtet weithin
-	-- sichtbar. Wer ihn ZUERST berührt, kassiert den Bonus (Server entscheidet).
-	GoldenSnack = {
-		IntervalMin = 120, -- Sekunden bis zum nächsten Spawn (Minimum)
-		IntervalMax = 240, -- ... und Maximum (wird zufällig gewürfelt)
-		Lifetime = 25, -- so lange bleibt er liegen, dann poff
-		CashBase = 1500, -- Basis-Belohnung (wird mit dem Rebirth-Multiplikator skaliert)
-		SpawnAreaX = 250, -- Spawn-Bereich: |x| < Wert (begehbare Map, innerhalb der Basen-Reihen)
-		SpawnAreaZ = 150, -- Spawn-Bereich: |z| < Wert
-	},
-
-	-- ══ Achievements ══
-	-- Meilensteine, die der AchievementService serverseitig trackt und einmalig
-	-- vergibt (profile.Achievements). Stat-Quellen:
-	--   Rebirths / TotalYeets / BaseLevel = direkt aus dem Profil
-	--   LegendaryPet = 1, sobald ein Legendary/Mythic-Pet im Besitz ist
-	--   Banked / Cracks / Golden = kumulative Zähler (profile.AchStats)
-	--
-	-- ⚠️ BadgeId = 0 heißt PLATZHALTER! Sobald auf der Creator-Seite
-	-- (create.roblox.com -> Badges) echte Badges angelegt sind, hier die
-	-- jeweiligen Ids eintragen – dann vergibt BadgeService:AwardBadge sie
-	-- automatisch zusätzlich zum In-Game-Popup. Ohne Id gibt's nur das Popup.
-	Achievements = {
-		{ Id = "ErsterYeet", Name = "🏈 Baby-YEET", Desc = "Deinen allerersten Snack geyeetet!", Stat = "TotalYeets", Value = 1, BadgeId = 0 },
-		{ Id = "YeetMaschine", Name = "💪 YEET-Maschine", Desc = "250 Snacks geyeetet!", Stat = "TotalYeets", Value = 250, BadgeId = 0 },
-		{ Id = "YeetGott", Name = "⚡ YEET-GOTT", Desc = "2000 Snacks geyeetet – deine Arme sind jetzt Legenden.", Stat = "TotalYeets", Value = 2000, BadgeId = 0, Announce = true },
-		{ Id = "ErsterSnack", Name = "🍫 Erster Schatz", Desc = "Deinen ersten Snack im Tresor eingelagert!", Stat = "Banked", Value = 1, BadgeId = 0 },
-		{ Id = "SnackSammler", Name = "🏦 Snack-Sammler", Desc = "100 Snacks eingelagert!", Stat = "Banked", Value = 100, BadgeId = 0 },
-		{ Id = "SnackBaron", Name = "👑 Snack-Baron", Desc = "1000 Snacks eingelagert – der Tresor ächzt!", Stat = "Banked", Value = 1000, BadgeId = 0, Announce = true },
-		{ Id = "ErsterRebirth", Name = "🌟 Sugar Rush!", Desc = "Deinen ersten Rebirth geschafft!", Stat = "Rebirths", Value = 1, BadgeId = 0 },
-		{ Id = "ZuckerJunkie", Name = "🍭 Zucker-Junkie", Desc = "5 Rebirths – du bist offiziell süchtig.", Stat = "Rebirths", Value = 5, BadgeId = 0, Announce = true },
-		{ Id = "Tresorknacker", Name = "😈 Tresorknacker", Desc = "Deinen ersten fremden Tresor geknackt!", Stat = "Cracks", Value = 1, BadgeId = 0 },
-		{ Id = "Meisterdieb", Name = "🥷 Meisterdieb", Desc = "25 Tresore geknackt – niemand ist sicher!", Stat = "Cracks", Value = 25, BadgeId = 0, Announce = true },
-		{ Id = "LegendenFang", Name = "🐉 Legenden-Fang", Desc = "Dein erstes Legendary- oder Mythic-Pet gezogen!", Stat = "LegendaryPet", Value = 1, BadgeId = 0 },
-		{ Id = "Goldjaeger", Name = "🌟 Goldjäger", Desc = "Deinen ersten Goldenen Snack geschnappt!", Stat = "Golden", Value = 1, BadgeId = 0 },
-		{ Id = "GoldenerBlitz", Name = "⚡ Goldener Blitz", Desc = "10 Goldene Snacks geschnappt – zu schnell für alle!", Stat = "Golden", Value = 10, BadgeId = 0, Announce = true },
-		{ Id = "Imperator", Name = "🏰 Imperator", Desc = "Das Snack-Imperium (Basis-Level 5) errichtet!", Stat = "BaseLevel", Value = 5, BadgeId = 0, Announce = true },
-	},
-	AchievementCheckInterval = 10, -- Sekunden zwischen zwei Poll-Checks der Profil-Stats
-
-	-- ══ Freunde-Bonus ══
-	-- Spielt ein Roblox-Freund gleichzeitig im selben Server, bekommen BEIDE
-	-- einen passiven Einkommens-Boost aufs rohe Tresor-Einkommen (eigener
-	-- Zahl-Tick im FriendBonusService, unabhängig vom BaseService).
-	FriendBonusPercent = 0.1, -- +10% Tresor-Einkommen, solange mind. 1 Freund online ist
-
-	-- ══ Referral-/Einladungssystem ══
-	-- Jeder Spieler hat einen Code ("YEET-<UserId>"). Löst ein NEUER Spieler
-	-- ihn ein, wird er dauerhaft mit dem Einladenden verknüpft. Erreicht der
-	-- Eingeladene den Meilenstein (Rebirth 1), kassiert der EINLADENDE –
-	-- auch wenn er gerade offline ist (Pending-DataStore).
-	Referral = {
-		RewardCash = 5000, -- Cash für den Einladenden pro erfolgreichem Freund
-		RewardEgg = "Golden", -- ... plus ein Gratis-Ei dieses Typs
-		MilestoneRebirths = 1, -- Meilenstein: der Eingeladene schafft so viele Rebirths
-		CheckInterval = 30, -- Sekunden zwischen zwei Meilenstein-Checks
-		DataStoreName = "YeetDenSnackReferrals_v1", -- Pending-Gutschriften für Offline-Einlader
-	},
-
 	-- ══ Daten ══
 	AutosaveInterval = 60, -- Sekunden
 	DataStoreName = "YeetDenSnack_v1",
+
+	-- ══ Goldener Snack (Zufalls-Minievent) ══
+	-- Spawnt unabhängig vom Truck an einer zufälligen Stelle der begehbaren Map.
+	-- Wer ihn ZUERST berührt/schnappt, kriegt den Cash-Bonus (Server vergibt genau 1x).
+	GoldenSnackFirstDelay = 75, -- Sekunden nach Serverstart bis zum ersten Golden-Spawn
+	GoldenSnackIntervalMin = 120, -- Abstand zwischen zwei Spawns wird zufällig ...
+	GoldenSnackIntervalMax = 240, -- ... aus [Min, Max] gewürfelt (Sekunden)
+	GoldenSnackLifetime = 25, -- Sekunden sichtbar, dann verschwindet er wieder
+	GoldenSnackReward = 750, -- Basis-Cash-Bonus (skaliert mit dem Rebirth-Multiplikator)
+	-- Spawn-Rechteck: deckt Plaza + Straße + Wiese ab, spart Basen (z=±120) und Shops (z=±80) aus
+	GoldenSnackArea = { MinX = -200, MaxX = 200, MinZ = -60, MaxZ = 60 },
+
+	-- ══ Freunde-Bonus ══
+	-- Spielt ein Roblox-Freund gleichzeitig im selben Server, bekommen BEIDE
+	-- einen passiven Einkommens-Boost aufs rohe Tresor-Einkommen (FriendService).
+	FriendBonusPercent = 0.1, -- +10% solange mindestens ein Freund online ist
+	FriendRecheckInterval = 60, -- Sekunden: fehlgeschlagene Freundes-Checks erneut versuchen
+
+	-- ══ Basis-Deko (Housing) ══
+	-- Rein kosmetische Deko-Objekte für die eigene Basis: kaufen (Cash),
+	-- in feste Slots stellen, wird pro Spieler persistent gespeichert und
+	-- beim nächsten Join automatisch wieder aufgebaut (HousingService).
+	HousingDataStore = "YeetDenSnack_Housing_v1",
+	-- Feste Deko-Slots als LOKALE Offsets relativ zum Basis-Slot
+	-- (44x44-Platte; -Z = vorne Richtung Straße; Tresor/Bau-Pad/Hort hinten
+	-- bei z>=10 werden ausgespart). Kein freies Bauen – nur diese Plätze.
+	HousingSlotOffsets = {
+		Vector3.new(-16, 0, -16), -- vorne links
+		Vector3.new(16, 0, -16), -- vorne rechts
+		Vector3.new(-16, 0, 2), -- Mitte links
+		Vector3.new(16, 0, 2), -- Mitte rechts
+		Vector3.new(0, 0, -19), -- Eingang (vorne Mitte)
+		Vector3.new(7, 0, 19), -- hinten neben dem Tresor
+	},
+	HousingDecor = {
+		{ Id = "Zuckerstange", Name = "🍬 Zuckerstange", Cost = 300, Color = Color3.fromRGB(255, 70, 70), Desc = "Rot-weiß gestreifter Klassiker." },
+		{ Id = "Fahne", Name = "🚩 Snack-Fahne", Cost = 600, Color = Color3.fromRGB(255, 150, 200), Desc = "Zeig allen, wessen Basis das ist!" },
+		{ Id = "Lolli", Name = "🍭 Riesen-Lolli", Cost = 1200, Color = Color3.fromRGB(255, 90, 220), Desc = "So groß, dass er als Baum durchgeht." },
+		{ Id = "Lampe", Name = "🏮 Zuckerwatte-Lampe", Cost = 2000, Color = Color3.fromRGB(255, 170, 220), Desc = "Flauschig-rosa Licht für laue Yeet-Nächte." },
+		{ Id = "Gummibaer", Name = "🐻 Gummibär-Statue", Cost = 4000, Color = Color3.fromRGB(255, 80, 80), Desc = "Ein Denkmal für alle gefallenen Gummibärchen." },
+		{ Id = "Donut", Name = "🍩 Donut-Schild", Cost = 7000, Color = Color3.fromRGB(255, 150, 200), Desc = "Leucht-Donut mit Streuseln. Sehr seriös." },
+		{ Id = "Brunnen", Name = "⛲ Schoko-Brunnen", Cost = 12000, Color = Color3.fromRGB(110, 65, 30), Desc = "Sprudelt echte* Schokolade. (*Platzhalter)" },
+		{ Id = "Disco", Name = "🪩 Disco-Bonbon", Cost = 25000, Color = Color3.fromRGB(180, 120, 255), Desc = "Party-Beleuchtung für Protz-Basen." },
+	},
+
+	-- ══ Referral/Einladungen ══
+	-- Jeder Spieler hat einen festen Code (Prefix + UserId). Löst ein NEUER
+	-- Spieler (vor seinem ersten Rebirth) den Code ein, wird er dauerhaft mit
+	-- dem Einlader verknüpft. Schafft der Eingeladene Rebirth 1, bekommt der
+	-- EINLADER die Belohnung (auch wenn er gerade offline ist -> PendingRewards).
+	ReferralDataStore = "YeetDenSnack_Referrals_v1",
+	ReferralCodePrefix = "SNACK-", -- eigener Code = "SNACK-<UserId>"
+	ReferralRewardCash = 10000, -- Cash für den Einlader pro geschafftem Meilenstein
+	ReferralRewardEgg = "Golden", -- + ein Gratis-Ei (Id aus Config.Eggs)
+
+	-- ══ Achievements/Badges ══
+	-- Meilensteine, serverseitig getrackt (eigener DataStore, AchievementService).
+	-- Stat = welcher Zähler, Goal = Ziel-Wert für die Freischaltung.
+	--
+	-- TODO (Creator Dashboard): Für jedes Achievement eine echte Roblox-Badge
+	-- anlegen (creator.roblox.com -> Spiel -> Engagement -> Badges) und die
+	-- Badge-Id hier bei BadgeId eintragen! Solange BadgeId = 0 ist, wird nur
+	-- intern freigeschaltet (Popup + Speicherung), aber keine Badge vergeben.
+	AchievementDataStore = "YeetDenSnack_Achievements_v1",
+	Achievements = {
+		{ Id = "FirstBank", Name = "🍪 Erster Streich", Desc = "Lagere deinen ersten Snack im Tresor ein.", Stat = "Banked", Goal = 1, BadgeId = 0 },
+		{ Id = "Bank100", Name = "🏦 Snack-Horter", Desc = "Lagere insgesamt 100 Snacks ein.", Stat = "Banked", Goal = 100, BadgeId = 0 },
+		{ Id = "Bank500", Name = "🏰 Zucker-Baron", Desc = "Lagere insgesamt 500 Snacks ein.", Stat = "Banked", Goal = 500, BadgeId = 0 },
+		{ Id = "FirstRebirth", Name = "🌟 Sugar Rush!", Desc = "Schaffe deinen ersten Rebirth.", Stat = "Rebirths", Goal = 1, BadgeId = 0 },
+		{ Id = "Rebirth5", Name = "🌈 Zucker-Junkie", Desc = "Erreiche Rebirth 5.", Stat = "Rebirths", Goal = 5, BadgeId = 0 },
+		{ Id = "FirstCrack", Name = "😈 Tresor-Knacker", Desc = "Knacke zum ersten Mal einen fremden Tresor.", Stat = "Cracks", Goal = 1, BadgeId = 0 },
+		{ Id = "FirstLegendaryPet", Name = "🐉 Legenden-Zieher", Desc = "Ziehe ein Legendary- oder Mythic-Pet aus einem Ei.", Stat = "LegendaryPets", Goal = 1, BadgeId = 0 },
+		{ Id = "Eggs25", Name = "🥚 Eierkopf", Desc = "Öffne 25 Eier im Pet-Shop.", Stat = "EggsOpened", Goal = 25, BadgeId = 0 },
+		{ Id = "PerfectYeet50", Name = "🎯 Yeet-Präzision", Desc = "Lande 50 PERFEKTE Yeets (goldene Zone!).", Stat = "PerfectYeets", Goal = 50, BadgeId = 0 },
+		{ Id = "Slap100", Name = "👋 Slap-Maschine", Desc = "Slappe 100 Spieler weg.", Stat = "Slaps", Goal = 100, BadgeId = 0 },
+		{ Id = "FirstMerge", Name = "🧪 Mutations-Meister", Desc = "Schaffe deinen ersten erfolgreichen Merge.", Stat = "Merges", Goal = 1, BadgeId = 0 },
+		{ Id = "GoldenGrab", Name = "🌟 Goldjunge", Desc = "Schnapp dir einen goldenen Snack.", Stat = "GoldenSnacks", Goal = 1, BadgeId = 0 },
+	},
 
 	-- ══ Pet-Shop ══
 	-- Pets sind schwebende Begleiter, die passiv Cash generieren (skaliert mit Rebirth-Multiplikator).
@@ -298,7 +316,7 @@ local Config = {
 			MergeSuccess = 30, -- Merge geglückt
 			Rebirth = 400, -- Sugar Rush
 			EggOpen = 15, -- Ei im Pet-Shop geöffnet
-			GoldenSnack = 40, -- Goldenen Snack als Erster geschnappt
+			GoldenSnack = 25, -- Goldenen Snack geschnappt (Zufalls-Minievent)
 		},
 
 		-- Belohnungen pro Stufe. Typen:
@@ -350,30 +368,6 @@ local Config = {
 	SeasonTrails = {
 		{ Id = "Zuckerwatte", Name = "🍭 Zuckerwatte-Wolke", Color = Color3.fromRGB(255, 170, 220), Seasonal = true, Desc = "Season-1-Belohnung: flauschig-rosa Spur!" },
 		{ Id = "Bonbon", Name = "🍬 Bonbon-Blizzard", Color = Color3.fromRGB(120, 220, 255), Rainbow = true, Seasonal = true, Desc = "Season-1-PREMIUM: wirbelnder Bonbon-Sturm!" },
-	},
-
-	-- ══ Basis-Deko (Housing) ══
-	-- Rein kosmetische Deko-Objekte für die eigene Basis: mit Cash kaufen,
-	-- dann in einen der festen Slots setzen (kein freies Bauen). Persistiert
-	-- pro Spieler (profile.Housing) und wird beim Join wieder aufgebaut.
-	Decorations = {
-		{ Id = "Zuckerstange", Name = "🍬 Zuckerstangen-Laterne", Cost = 500, Desc = "Rot-weiß gestreift und leuchtet nachts!" },
-		{ Id = "Lolli", Name = "🍭 Riesen-Lolli", Cost = 1500, Desc = "So groß, dass er als Sonnenschirm durchgeht." },
-		{ Id = "Gummibaer", Name = "🐻 Gummibär-Wächter", Cost = 4000, Desc = "Bewacht deine Basis. Rein dekorativ. Leider." },
-		{ Id = "Donut", Name = "🍩 Mega-Donut", Cost = 8000, Desc = "Mit Streuseln! Anlehnen verboten." },
-		{ Id = "Brunnen", Name = "⛲ Schoko-Brunnen", Cost = 20000, Desc = "Sprudelt echte* Schokolade. (*nicht echt)" },
-		{ Id = "Eisturm", Name = "🍦 Softeis-Turm", Cost = 40000, Desc = "Drei Kugeln Angeberei mit Sahnehaube." },
-		{ Id = "Disco", Name = "🪩 Disco-Bonbon", Cost = 75000, Desc = "Party-Beleuchtung für die reichste Basis der Straße." },
-	},
-	-- Feste Deko-Slots: lokale Offsets relativ zur Basis-Mitte (kollidieren
-	-- nicht mit Zaun/Hort/Tresor/Bau-Pad der Tycoon-Ausbaustufen)
-	DecoSlots = {
-		Vector3.new(-16, 0, -16), -- vorne links
-		Vector3.new(16, 0, -16), -- vorne rechts
-		Vector3.new(-16, 0, 4), -- mitte links
-		Vector3.new(16, 0, 4), -- mitte rechts
-		Vector3.new(-8, 0, -18), -- Eingang links
-		Vector3.new(8, 0, -18), -- Eingang rechts
 	},
 
 	-- ══ Debug/Test-Menü ══
@@ -452,9 +446,9 @@ for _, def in Config.EggPets do
 	Config.EggPetsById[def.Id] = def
 end
 
-Config.DecorationsById = {} :: { [string]: any }
-for _, def in Config.Decorations do
-	Config.DecorationsById[def.Id] = def
+Config.HousingDecorById = {} :: { [string]: any }
+for _, def in Config.HousingDecor do
+	Config.HousingDecorById[def.Id] = def
 end
 
 -- Chancen eines Eis als normalisierte Prozente (fürs UI, immer synchron zum Server-Wurf)
