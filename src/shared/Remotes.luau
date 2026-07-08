@@ -38,6 +38,8 @@ local FUNCTIONS = {
 	"RedeemReferral", -- Client -> Server: Referral-Code einlösen (code), gibt {ok, msg} zurück
 	"RedeemPromoCode", -- Client -> Server: Promo-Code einlösen (code), gibt {ok, msg} zurück
 	"GetLeaderboards", -- Client -> Server: gecachte globale Top-Listen abfragen (KEIN DataStore-Hit)
+	"GetDailyInfo", -- Client -> Server: Login-Streak-Status abfragen {CanClaim, Streak, NextIndex}
+	"ClaimDailyReward", -- Client -> Server: Tagesbelohnung abholen, gibt {ok, msg, Streak?} zurück
 	"GetHousing", -- Client -> Server: eigene Deko (gekauft + platziert) abfragen
 	"BuyDecor", -- Client -> Server: Deko-Objekt kaufen (decorId), gibt {ok, msg} zurück
 	"PlaceDecor", -- Client -> Server: Deko aufstellen/entfernen (decorId, place), gibt {ok, msg} zurück

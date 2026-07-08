@@ -2787,6 +2787,128 @@ local function buildHousing()
 	end)
 end
 
+-- ══════════ Täglicher Login-Streak ══════════
+-- Popup beim ersten Join des Tages (wenn abholbar) + 📅-Button unten links.
+-- Streak/Claim validiert komplett der DailyRewardService.
+
+local function buildDailyReward()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "DailyToggle"
+	toggle.AnchorPoint = Vector2.new(0, 1)
+	toggle.Position = UDim2.new(0, 12, 1, -60) -- über dem Debug-Button (falls sichtbar)
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(90, 160, 240)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "📅"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("📅 TÄGLICHE BELOHNUNG", Vector2.new(420, 430), Color3.fromRGB(140, 200, 255))
+
+	local streakLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 24),
+		Text = "",
+		TextColor3 = Color3.fromRGB(255, 220, 80),
+	})
+
+	-- 7 Tages-Zeilen
+	local rows: { { Row: Frame, Label: TextLabel } } = {}
+	for i, def in Config.DailyRewards do
+		local row = Instance.new("Frame")
+		row.Position = UDim2.new(0, 16, 0, 74 + (i - 1) * 38)
+		row.Size = UDim2.new(1, -32, 0, 32)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		roundify(row, 8)
+		row.Parent = frame
+		local label = makeLabel(row, {
+			Position = UDim2.fromOffset(10, 2),
+			Size = UDim2.new(1, -20, 1, -4),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = ("Tag %d:  %s"):format(i, def.Label),
+		})
+		rows[i] = { Row = row, Label = label }
+	end
+
+	local claimButton = Instance.new("TextButton")
+	claimButton.AnchorPoint = Vector2.new(0.5, 1)
+	claimButton.Position = UDim2.new(0.5, 0, 1, -12)
+	claimButton.Size = UDim2.new(1, -32, 0, 48)
+	claimButton.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+	claimButton.Font = FONT
+	claimButton.TextScaled = true
+	claimButton.Text = "🎁 ABHOLEN!"
+	claimButton.TextColor3 = Color3.new(1, 1, 1)
+	roundify(claimButton, 12)
+	claimButton.Parent = frame
+
+	local function refresh()
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return (Remotes.Get("GetDailyInfo") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(info) ~= "table" then
+				return
+			end
+			streakLabel.Text = if info.Streak > 0
+				then ("🔥 Dein Streak: %d Tag(e) am Stück!"):format(info.Streak)
+				else "Hol dir jeden Tag eine Belohnung ab!"
+			for i, refs in rows do
+				if info.CanClaim and i == info.NextIndex then
+					refs.Row.BackgroundColor3 = Color3.fromRGB(60, 90, 60)
+					refs.Label.TextColor3 = Color3.fromRGB(150, 255, 170)
+				else
+					refs.Row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+					refs.Label.TextColor3 = Color3.new(1, 1, 1)
+				end
+			end
+			if info.CanClaim then
+				claimButton.Text = "🎁 ABHOLEN!"
+				claimButton.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				toggle.Text = "📅❗"
+			else
+				claimButton.Text = "✅ Heute schon abgeholt – bis morgen!"
+				claimButton.BackgroundColor3 = Color3.fromRGB(90, 90, 110)
+				toggle.Text = "📅"
+			end
+		end)
+	end
+
+	claimButton.Activated:Connect(function()
+		task.spawn(function()
+			local ok, result = pcall(function()
+				return (Remotes.Get("ClaimDailyReward") :: RemoteFunction):InvokeServer()
+			end)
+			if ok and typeof(result) == "table" then
+				Ui.Toast((result.ok and "🎁 " or "❌ ") .. result.msg)
+			end
+			refresh()
+		end)
+	end)
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+
+	-- Auto-Popup beim Join, wenn heute noch nicht abgeholt wurde
+	task.delay(4, function()
+		local ok, info = pcall(function()
+			return (Remotes.Get("GetDailyInfo") :: RemoteFunction):InvokeServer()
+		end)
+		if ok and typeof(info) == "table" and info.CanClaim then
+			frame.Visible = true
+			refresh()
+		elseif ok and typeof(info) == "table" then
+			refresh() -- Button-Ausrufezeichen korrekt setzen
+		end
+	end)
+end
+
 -- ══════════ Globale Bestenlisten ══════════
 -- Zeigt die vom Server gecachten Top-Listen (GetLeaderboards liest NUR den
 -- Server-Cache, kein DataStore-Hit). Eigener Eintrag wird hervorgehoben.
@@ -3265,6 +3387,7 @@ function Ui.Build()
 	buildHousing()
 	buildRobuxShop()
 	buildLeaderboard()
+	buildDailyReward()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

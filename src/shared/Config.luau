@@ -513,6 +513,20 @@ local Config = {
 		{ Id = "Kristall", Name = "💎 Kristall-Körper", GemCost = 120, Color = Color3.fromRGB(150, 225, 255), Material = Enum.Material.Glass, Transparency = 0.35, Desc = "Durchsichtig, glänzend, unbezahlbar (fast)." },
 	},
 
+	-- ══ Täglicher Login-Streak ══
+	-- 7-Tage-Zyklus: Tag 1-7, danach geht's wieder bei Tag 1 los (der
+	-- Streak-Zähler läuft zum Angeben weiter). Ein verpasster Tag (UTC)
+	-- resettet den Streak auf Tag 1. Belohnungs-Typen wie bei PromoCodes.
+	DailyRewards = {
+		{ Type = "Cash", Amount = 500, Label = "💰 500 Cash" },
+		{ Type = "Cash", Amount = 1200, Label = "💰 1.2k Cash" },
+		{ Type = "Egg", Egg = "Basic", Label = "🥚 Snack-Ei" },
+		{ Type = "Cash", Amount = 3000, Label = "💰 3k Cash" },
+		{ Type = "Gems", Amount = 5, Label = "💎 5 Juwelen" },
+		{ Type = "Cash", Amount = 6000, Label = "💰 6k Cash" },
+		{ Type = "Egg", Egg = "Golden", Label = "🌟 GOLD-EI!" },
+	},
+
 	-- ══ Globale Bestenlisten ══
 	-- Server-übergreifende Top-Listen über OrderedDataStores. Intervalle
 	-- bewusst träge (DataStore-Budget!): Schreiben alle 2 Min pro Spieler,
