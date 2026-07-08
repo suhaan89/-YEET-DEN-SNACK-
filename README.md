@@ -74,6 +74,20 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
 21. ✨ **Grafik-Politur** (AtmosphereService): ShadowMap-Lighting, Atmosphere,
    Bloom, SunRays, ColorCorrection, Wolken + Candy-Straßenlaternen,
    Riesen-Zuckerstangen, Plaza-Neonrahmen und Willkommens-Bogen am Spawn.
+22. 🌀 **Parkour-Minigame** (`Config.ParkourCourses`): Portal-Hub hinter dem
+   Spawn mit 8 Portalen → 8 separate Arenen hoch über der Map (5 kurze,
+   3 lange mit Checkpoints). Feste Freischaltungs-Reihenfolge (Parcours n+1
+   erst nach Abschluss von n, persistent), steigende Schwierigkeit (Sprünge →
+   Lava → rotierende Balken → Blink-Platten → Fahr-Plattformen → Kombis).
+   Server-autoritative Zeitmessung (Start-/Ziellinie), zeitbasierte Tier-
+   Belohnungen, Cooldown pro Parcours, „Aufgeben“-Button, Session-Bestzeit
+   als Leaderboard am Portal. Slap ist in den Arenen deaktiviert.
+23. 💎 **Juwelen** (GemService, eigener DataStore): zweite Währung, verdienbar
+   NUR im Parkour (leaderstats + HUD neben Cash). Ausgeben: **Juwelen-Ei**
+   (`Config.GemEggs`, deutlich bessere Pet-Chancen), **Juwelen-Trails/-Skin**
+   (`Config.GemTrails`/`GemSkins`, nicht mit Cash kaufbar) und der exklusive
+   **Juwelensturm-Trail** für alle 8 Parcours unter der Meister-Zeit
+   (`MasterTime` pro Parcours).
 
 ## Entwicklung
 
@@ -119,6 +133,11 @@ src/server/   → ServerScriptService.Server
   Services/ReferralService Einladungs-Codes + Prämie bei Rebirth 1 (eigener DataStore)
   Services/HousingService  Basis-Deko: kaufen, Slots, persistenter Wiederaufbau
   Services/AtmosphereService  Grafik-Politur (Lighting-Effects + Map-Deko)
+  Services/GemService      Juwelen-Währung + Parkour-Fortschritt/Bestzeiten
+                           (eigener DataStore, leaderstats "Juwelen")
+  Services/ParkourService  Portal-Hub, Teleports, Zeitmessung, Belohnungen,
+                           Hindernis-Animationen, Portal-Leaderboards
+  Modules/ParkourMap.luau  Baut die 8 Parkour-Arenen (Cursor-Segment-System)
   Services/DebugService    Admin-/Test-Menü (Studio, Spiel-Besitzer, Whitelist)
 
 src/client/   → StarterPlayerScripts
@@ -150,3 +169,7 @@ src/client/   → StarterPlayerScripts
 7. **Achievement-Badges** im Creator Dashboard anlegen (Spiel -> Engagement
    -> Badges, eine pro Eintrag in `Config.Achievements`) und die BadgeIds
    dort eintragen (solange 0: Freischaltung nur intern, keine Roblox-Badge).
+8. **Parkour testlaufen**: alle 8 Parcours einmal durchspringen (Debug-Menü:
+   „Parkour: alle 8 freischalten“ + „Cooldowns resetten“) und bei zu
+   harten/leichten Stellen Zeiten/Belohnungen in `Config.ParkourCourses`
+   bzw. Layouts in `Modules/ParkourMap.luau` nachjustieren.
