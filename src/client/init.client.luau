@@ -10,6 +10,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ContextActionService = game:GetService("ContextActionService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -457,13 +458,22 @@ local function runTutorial()
 		return
 	end
 	tutorialShown = true
+	local touch = UserInputService.TouchEnabled
 	local steps = {
 		"👋 Willkommen bei YEET DEN SNACK!",
-		"🏠 Such dir ZUERST eine FREIE BASIS und drück E am Tresor – die gehört dann dir!",
+		if touch
+			then "🏠 Such dir ZUERST eine FREIE BASIS und tipp den Knopf am Tresor – die gehört dann dir!"
+			else "🏠 Such dir ZUERST eine FREIE BASIS und drück E am Tresor – die gehört dann dir!",
 		"🚚 Gleich kommt der SCHOKO-TRUCK und verliert Snacks!",
-		"✋ Drück E bei einem Snack zum Aufheben – aber nur 4 Sekunden halten!",
-		"🖱️ Klick HALTEN & loslassen = YEET Richtung deiner Basis (folge dem gelben Strahl!)",
-		"👋 Q = SLAP! Wer getroffen wird, lässt seinen Snack fallen...",
+		if touch
+			then "✋ Tipp den Knopf bei einem Snack zum Aufheben – aber nur 4 Sekunden halten!"
+			else "✋ Drück E bei einem Snack zum Aufheben – aber nur 4 Sekunden halten!",
+		if touch
+			then "👆 YEET-Button HALTEN & loslassen = Wurf Richtung Basis (folge dem gelben Strahl!)"
+			else "🖱️ Klick HALTEN & loslassen = YEET Richtung deiner Basis (folge dem gelben Strahl!)",
+		if touch
+			then "👋 SLAP-Button = SLAP! Wer getroffen wird, lässt seinen Snack fallen..."
+			else "👋 Q = SLAP! Wer getroffen wird, lässt seinen Snack fallen...",
 		"🏦 Snacks im Tresor = Cash pro Sekunde. Aber Achtung: die Plätze sind BEGRENZT!",
 	}
 	for i, text in steps do
@@ -481,12 +491,32 @@ else
 	end)
 end
 
--- Touch-Buttons beschriften/positionieren (nur auf Mobile sichtbar)
+-- ══════════ Mobile/Touch-Steuerung ══════════
+-- Die E/R-Interaktionen laufen komplett über ProximityPrompts (zeigen auf
+-- Touch automatisch Tipp-Buttons). Hier machen wir die beiden CAS-Buttons
+-- (YEET halten, SLAP tippen) groß genug für Daumen und legen sie neben den
+-- Sprung-Knopf. Press-and-Hold auf dem YEET-Button nutzt exakt dieselbe
+-- Begin/End-Logik wie der Maus-Klick – gleiche Ladebalken- und Sweet-Spot-
+-- Mechanik, kein zweiter Codepfad.
 pcall(function()
 	ContextActionService:SetTitle("Yeet", "YEET!")
-	ContextActionService:SetPosition("Yeet", UDim2.new(1, -90, 0, -140))
 	ContextActionService:SetTitle("Slap", "SLAP!")
-	ContextActionService:SetPosition("Slap", UDim2.new(1, -160, 0, -70))
+	if UserInputService.TouchEnabled then
+		-- Groß und im Daumen-Bogen um den Jump-Button (rechts unten)
+		ContextActionService:SetPosition("Yeet", UDim2.new(1, -95, 0, -170))
+		ContextActionService:SetPosition("Slap", UDim2.new(1, -175, 0, -95))
+		local yeetButton = ContextActionService:GetButton("Yeet")
+		if yeetButton then
+			yeetButton.Size = UDim2.fromOffset(85, 85)
+		end
+		local slapButton = ContextActionService:GetButton("Slap")
+		if slapButton then
+			slapButton.Size = UDim2.fromOffset(70, 70)
+		end
+	else
+		ContextActionService:SetPosition("Yeet", UDim2.new(1, -90, 0, -140))
+		ContextActionService:SetPosition("Slap", UDim2.new(1, -160, 0, -70))
+	end
 end)
 
 print("🍫 [YEET DEN SNACK] Client bereit!")

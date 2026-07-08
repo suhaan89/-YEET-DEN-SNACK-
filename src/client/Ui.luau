@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
@@ -1103,8 +1104,12 @@ end
 function Ui.SetHoldHint(visible: boolean, snackName: string?)
 	holdHint.Visible = visible
 	if visible then
-		holdHint.Text = ("🍫 %s – Klick HALTEN & loslassen zum YEETEN! (%ds Zeit!)"):format(
+		local action = if UserInputService.TouchEnabled
+			then "YEET-Button HALTEN & loslassen"
+			else "Klick HALTEN & loslassen"
+		holdHint.Text = ("🍫 %s – %s zum YEETEN! (%ds Zeit!)"):format(
 			snackName or "Snack",
+			action,
 			Config.HoldDuration
 		)
 	end
@@ -1364,8 +1369,6 @@ local function buildDebugMenu()
 	end
 	debugBuilt = true
 
-	local UserInputService = game:GetService("UserInputService")
-	local RunService = game:GetService("RunService")
 	local debugRemote = Remotes.Get("DebugCommand") :: RemoteFunction
 
 	-- Sichere Invoke-Hülle (Server prüft die Whitelist bei jedem Aufruf selbst)
@@ -2802,6 +2805,30 @@ function Ui.Build()
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false
 	gui.Parent = player:WaitForChild("PlayerGui")
+
+	-- Responsive Skalierung: das ganze UI ist mit Pixel-Offsets für ~1280x720
+	-- gebaut. Auf kleineren Screens (Handy/Tablet) schrumpft eine UIScale
+	-- alles proportional mit, damit Fenster wie der 540er-Season-Pass nicht
+	-- über den Rand laufen. Untergrenze 0.55, sonst wird Text unlesbar.
+	local uiScale = Instance.new("UIScale")
+	uiScale.Parent = gui
+	local function refreshScale()
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+		local vp = camera.ViewportSize
+		uiScale.Scale = math.clamp(math.min(vp.X / 1280, vp.Y / 720), 0.55, 1)
+	end
+	task.spawn(function()
+		local camera = workspace.CurrentCamera
+		while not camera do
+			task.wait(0.2)
+			camera = workspace.CurrentCamera
+		end
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(refreshScale)
+		refreshScale()
+	end)
 
 	-- Banner
 	announceLabel = makeLabel(gui, {
