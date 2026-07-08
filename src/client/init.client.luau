@@ -67,6 +67,64 @@ end);
 	end
 end);
 
+(Remotes.Get("ParkourResult") :: RemoteEvent).OnClientEvent:Connect(function(data)
+	if typeof(data) == "table" then
+		Ui.ParkourResult(data)
+	end
+end);
+
+-- ══════════ Parkour-Portale: Sperr-Optik (nur lokal!) ══════════
+-- Der Server baut für alle dieselben Portale; welche davon für MICH offen
+-- sind, sagt das ParkourUnlocked-Attribut (setzt der GemService). Gesperrte
+-- Portale werden lokal grau + kriegen ein 🔒-Schild.
+
+task.spawn(function()
+	local hub = workspace:WaitForChild("ParkourHub", 60)
+	if not hub then
+		return
+	end
+	local lockGuis: { [BasePart]: BillboardGui } = {}
+
+	local function refreshLocks()
+		local unlocked = player:GetAttribute("ParkourUnlocked")
+		if typeof(unlocked) ~= "number" then
+			unlocked = 1
+		end
+		for index, def in Config.ParkourCourses do
+			local portal = hub:FindFirstChild("Portal_" .. def.Id)
+			local fill = portal and portal:FindFirstChild("Fill")
+			if not (fill and fill:IsA("BasePart")) then
+				continue
+			end
+			local locked = index > unlocked
+			fill.Color = if locked then Color3.fromRGB(55, 55, 65) else def.Color
+			fill.Transparency = if locked then 0.1 else 0.35
+			if locked and not lockGuis[fill] then
+				local gui = Instance.new("BillboardGui")
+				gui.Name = "LocalLock"
+				gui.Size = UDim2.fromOffset(120, 90)
+				gui.StudsOffset = Vector3.new(0, 0, 0)
+				gui.MaxDistance = 120
+				gui.AlwaysOnTop = true
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.Text = "🔒"
+				label.TextScaled = true
+				label.Parent = gui
+				gui.Parent = fill
+				lockGuis[fill] = gui
+			elseif not locked and lockGuis[fill] then
+				lockGuis[fill]:Destroy()
+				lockGuis[fill] = nil
+			end
+		end
+	end
+
+	player:GetAttributeChangedSignal("ParkourUnlocked"):Connect(refreshLocks)
+	refreshLocks()
+end);
+
 -- ══════════ Basis-Flash bei Treffer ══════════
 -- Landet ein Snack in einer Basis-Zone, leuchtet die getroffene Basis kurz auf.
 -- Getriggert über das "bank"-Sound-Event (kommt mit der Einschlag-Position).

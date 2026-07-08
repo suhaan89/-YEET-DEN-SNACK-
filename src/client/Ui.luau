@@ -14,6 +14,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
@@ -165,6 +166,40 @@ local function buildCashDisplay()
 			cash.Changed:Connect(refresh)
 		end
 		player:GetAttributeChangedSignal("Multiplier"):Connect(refresh)
+		refresh()
+	end)
+end
+
+-- ══════════ Juwelen-Anzeige (💎 gibt's NUR im Parkour) ══════════
+
+local function buildGemDisplay()
+	local frame = Instance.new("Frame")
+	frame.Name = "GemDisplay"
+	frame.Position = UDim2.new(0, 12, 0, 62)
+	frame.Size = UDim2.fromOffset(190, 36)
+	frame.BackgroundColor3 = Color3.fromRGB(20, 40, 55)
+	frame.BackgroundTransparency = 0.25
+	roundify(frame, 12)
+	local label = makeLabel(frame, {
+		Size = UDim2.new(1, -16, 1, -8),
+		Position = UDim2.fromOffset(8, 4),
+		Text = "💎 0",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(150, 230, 255),
+	})
+	frame.Parent = gui
+
+	-- Juwelen live aus den Leaderstats spiegeln (Zeile hängt der GemService an)
+	task.spawn(function()
+		local stats = player:WaitForChild("leaderstats", 20)
+		local gems = stats and stats:WaitForChild("Juwelen", 30) :: IntValue?
+		if not gems then
+			return
+		end
+		local function refresh()
+			label.Text = "💎 " .. formatNumber(gems.Value)
+		end
+		gems.Changed:Connect(refresh)
 		refresh()
 	end)
 end
@@ -373,6 +408,13 @@ local function refreshRows(items: { any }, rows: { [string]: TextButton }, owned
 				-- Season-Items kann man nicht kaufen – nur über den Pass verdienen
 				button.Text = "🎫 PASS"
 				button.BackgroundColor3 = Color3.fromRGB(90, 90, 110)
+			elseif def.RewardOnly then
+				-- Parkour-Meister-Belohnung: nicht kaufbar
+				button.Text = "🏅 MEISTER"
+				button.BackgroundColor3 = Color3.fromRGB(90, 90, 110)
+			elseif def.GemCost then
+				button.Text = formatNumber(def.GemCost) .. "💎"
+				button.BackgroundColor3 = Color3.fromRGB(60, 170, 200)
 			else
 				button.Text = formatNumber(def.Cost) .. "💰"
 				button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
@@ -392,7 +434,9 @@ local function refreshCollectionShops()
 		collectionsCache = data
 		refreshRows(Config.Trails, trailRows, data.Trails, data.EquippedTrail)
 		refreshRows(Config.SeasonTrails, trailRows, data.Trails, data.EquippedTrail)
+		refreshRows(Config.GemTrails, trailRows, data.Trails, data.EquippedTrail)
 		refreshRows(Config.Skins, skinRows, data.Skins, data.EquippedSkin)
+		refreshRows(Config.GemSkins, skinRows, data.Skins, data.EquippedSkin)
 		refreshPetInventory()
 	end)
 end
@@ -478,8 +522,12 @@ local function buildCollectionShop(shopId: string, title: string, titleColor: Co
 			button.Font = FONT
 			button.TextScaled = true
 			button.TextColor3 = Color3.new(1, 1, 1)
-			-- Season-Items haben keinen Preis (gibt's nur über den Pass)
-			button.Text = if def.Seasonal then "🎫 PASS" else formatNumber(def.Cost) .. "💰"
+			-- Season-/Meister-Items haben keinen Preis, Gem-Items kosten 💎
+			button.Text = if def.Seasonal
+				then "🎫 PASS"
+				elseif def.RewardOnly then "🏅 MEISTER"
+				elseif def.GemCost then formatNumber(def.GemCost) .. "💎"
+				else formatNumber(def.Cost) .. "💰"
 			roundify(button, 10)
 			button.Parent = row
 			section.Rows[def.Id] = button
@@ -658,11 +706,12 @@ local function buildPetShop()
 	eggHeader.LayoutOrder = 1
 
 	local buying = false -- Doppelklick-Schutz (Server validiert eh, das hier ist nur UX)
-	for i, eggDef in Config.Eggs do
+	-- Eine Ei-Zeile (Cash-Eier UND Juwelen-Eier – Unterschied ist nur der Preis-Knopf)
+	local function makeEggRow(eggDef: any, order: number)
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, -8, 0, 66)
 		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
-		row.LayoutOrder = 1 + i
+		row.LayoutOrder = order
 		roundify(row, 10)
 		row.Parent = list
 
@@ -696,11 +745,11 @@ local function buildPetShop()
 		button.AnchorPoint = Vector2.new(1, 0.5)
 		button.Position = UDim2.new(1, -8, 0.5, 0)
 		button.Size = UDim2.fromOffset(115, 44)
-		button.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+		button.BackgroundColor3 = if eggDef.GemCost then Color3.fromRGB(60, 170, 200) else Color3.fromRGB(240, 160, 40)
 		button.Font = FONT
 		button.TextScaled = true
 		button.TextColor3 = Color3.new(1, 1, 1)
-		button.Text = formatNumber(eggDef.Cost) .. "💰"
+		button.Text = if eggDef.GemCost then formatNumber(eggDef.GemCost) .. "💎" else formatNumber(eggDef.Cost) .. "💰"
 		roundify(button, 10)
 		button.Parent = row
 
@@ -726,6 +775,14 @@ local function buildPetShop()
 				refreshCollectionShops()
 			end)
 		end)
+	end
+
+	for i, eggDef in Config.Eggs do
+		makeEggRow(eggDef, 1 + i)
+	end
+	-- Juwelen-Eier direkt darunter (💎 verdient man NUR im Parkour!)
+	for i, eggDef in Config.GemEggs do
+		makeEggRow(eggDef, 1 + #Config.Eggs + i)
 	end
 
 	-- ── Sektion 2: Pet-Inventar ──
@@ -1072,6 +1129,136 @@ function Ui.SetCharge(fraction: number)
 	end
 end
 
+-- ══════════ Parkour: Lauf-HUD + Ergebnis-Anzeige ══════════
+-- Datenquelle: Attribute ParkourCourse/ParkourStart (setzt NUR der Server).
+-- Die Uhr ist workspace:GetServerTimeNow() – exakt dieselbe, mit der der
+-- Server misst, also lügt der Timer nie.
+
+local function buildParkourHud()
+	local frame = Instance.new("Frame")
+	frame.Name = "ParkourHud"
+	frame.AnchorPoint = Vector2.new(0.5, 0)
+	frame.Position = UDim2.new(0.5, 0, 0, 72)
+	frame.Size = UDim2.fromOffset(340, 64)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+	frame.BackgroundTransparency = 0.25
+	frame.Visible = false
+	roundify(frame, 12)
+	frame.Parent = gui
+
+	local nameLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(10, 4),
+		Size = UDim2.new(1, -115, 0, 22),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	local timeLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(10, 28),
+		Size = UDim2.new(1, -115, 0, 30),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 220, 80),
+	})
+
+	local leave = Instance.new("TextButton")
+	leave.AnchorPoint = Vector2.new(1, 0.5)
+	leave.Position = UDim2.new(1, -8, 0.5, 0)
+	leave.Size = UDim2.fromOffset(95, 46)
+	leave.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+	leave.Font = FONT
+	leave.TextScaled = true
+	leave.Text = "🏳️ RAUS"
+	leave.TextColor3 = Color3.new(1, 1, 1)
+	roundify(leave, 10)
+	leave.Parent = frame
+	leave.Activated:Connect(function()
+		(Remotes.Get("ParkourLeave") :: RemoteEvent):FireServer()
+	end)
+
+	local function refreshVisibility()
+		local courseId = player:GetAttribute("ParkourCourse")
+		local def = if typeof(courseId) == "string" then Config.ParkourCoursesById[courseId] else nil
+		frame.Visible = def ~= nil
+		if def then
+			nameLabel.Text = def.Name
+			nameLabel.TextColor3 = def.Color
+		end
+	end
+	player:GetAttributeChangedSignal("ParkourCourse"):Connect(refreshVisibility)
+	refreshVisibility()
+
+	RunService.RenderStepped:Connect(function()
+		if not frame.Visible then
+			return
+		end
+		local startAt = player:GetAttribute("ParkourStart")
+		if typeof(startAt) ~= "number" or startAt <= 0 then
+			timeLabel.Text = "🏁 Lauf durchs GRÜNE Tor!"
+		else
+			timeLabel.Text = ("⏱️ %.2fs"):format(math.max(0, workspace:GetServerTimeNow() - startAt))
+		end
+	end)
+end
+
+-- Ergebnis-Panel nach einem geschafften Lauf (verschwindet mit dem Rück-Teleport)
+function Ui.ParkourResult(data: any)
+	local frame = Instance.new("Frame")
+	frame.Name = "ParkourResult"
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromScale(0.5, 0.38)
+	frame.Size = UDim2.fromOffset(400, 200)
+	frame.BackgroundColor3 = Color3.fromRGB(35, 30, 45)
+	frame.BackgroundTransparency = 0.06
+	frame.ZIndex = 15
+	roundify(frame, 16)
+	frame.Parent = gui
+
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(10, 8),
+		Size = UDim2.new(1, -20, 0, 34),
+		Text = "🏁 GESCHAFFT: " .. tostring(data.Name),
+		TextColor3 = Color3.fromRGB(140, 255, 160),
+		ZIndex = 16,
+	})
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(10, 48),
+		Size = UDim2.new(1, -20, 0, 52),
+		Text = ("⏱️ %.2fs"):format(tonumber(data.Time) or 0),
+		TextColor3 = Color3.fromRGB(255, 220, 80),
+		ZIndex = 16,
+	})
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(10, 108),
+		Size = UDim2.new(1, -20, 0, 34),
+		Text = ("+%d💰   +%d💎"):format(tonumber(data.Cash) or 0, tonumber(data.Gems) or 0),
+		ZIndex = 16,
+	})
+
+	local extras = {}
+	if data.ServerRecord then
+		table.insert(extras, "🏆 SERVER-REKORD!")
+	end
+	if data.PersonalBest then
+		table.insert(extras, "✨ Neue Bestzeit!")
+	end
+	if data.UnlockedNext then
+		table.insert(extras, "🔓 Nächster Parcours offen!")
+	end
+	if #extras > 0 then
+		makeLabel(frame, {
+			Position = UDim2.fromOffset(10, 150),
+			Size = UDim2.new(1, -20, 0, 30),
+			Text = table.concat(extras, "  "),
+			TextColor3 = Color3.fromRGB(255, 180, 255),
+			ZIndex = 16,
+		})
+	end
+
+	task.delay(Config.ParkourReturnDelay + 0.5, function()
+		frame:Destroy()
+	end)
+end
+
 -- ══════════ Supreme-Truck-Fortschritt ══════════
 -- Zeigt, wie viele Trucks es noch bis zum Mutanten-Express sind.
 -- Datenquelle: Workspace-Attribute (setzt der TruckService, replizieren automatisch).
@@ -1079,7 +1266,7 @@ end
 local function buildSupremeBar()
 	local frame = Instance.new("Frame")
 	frame.Name = "SupremeProgress"
-	frame.Position = UDim2.new(0, 12, 0, 66) -- sitzt da, wo früher der Shop-Button war
+	frame.Position = UDim2.new(0, 12, 0, 104) -- unter der Juwelen-Anzeige (y=62, Höhe 36)
 	frame.Size = UDim2.fromOffset(190, 48)
 	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 	frame.BackgroundTransparency = 0.25
@@ -1133,7 +1320,7 @@ end
 local function buildFriendBonus()
 	local frame = Instance.new("Frame")
 	frame.Name = "FriendBonus"
-	frame.Position = UDim2.new(0, 12, 0, 120) -- unter SupremeProgress (y=66, Höhe 48)
+	frame.Position = UDim2.new(0, 12, 0, 158) -- unter SupremeProgress (y=104, Höhe 48)
 	frame.Size = UDim2.fromOffset(190, 30)
 	frame.BackgroundColor3 = Color3.fromRGB(30, 55, 40)
 	frame.BackgroundTransparency = 0.25
@@ -2639,6 +2826,7 @@ function Ui.Build()
 	toastContainer.Parent = gui
 
 	buildCashDisplay()
+	buildGemDisplay()
 	buildShop()
 	buildPetShop()
 	buildCollectionShop("Style", "✨ STYLE-SHOP", Color3.fromRGB(240, 140, 240), {
@@ -2661,8 +2849,26 @@ function Ui.Build()
 			EquippedKey = "EquippedTrail",
 		},
 		{
+			Header = "💎 JUWELEN-TRAILS (nur mit Parkour-Juwelen!)",
+			Items = Config.GemTrails,
+			Rows = trailRows, -- Ids sind eindeutig, gleiche Map wie normale Trails
+			BuyRemote = "BuyTrail",
+			EquipRemote = "EquipTrail",
+			OwnedKey = "Trails",
+			EquippedKey = "EquippedTrail",
+		},
+		{
 			Header = "🧍 SKINS",
 			Items = Config.Skins,
+			Rows = skinRows,
+			BuyRemote = "BuySkin",
+			EquipRemote = "EquipSkin",
+			OwnedKey = "Skins",
+			EquippedKey = "EquippedSkin",
+		},
+		{
+			Header = "💎 JUWELEN-SKINS",
+			Items = Config.GemSkins,
 			Rows = skinRows,
 			BuyRemote = "BuySkin",
 			EquipRemote = "EquipSkin",
@@ -2674,6 +2880,7 @@ function Ui.Build()
 	buildSupremeBar()
 	buildFriendBonus()
 	buildChargeBar()
+	buildParkourHud()
 	buildSeasonPass()
 	buildAchievements()
 	buildReferral()
