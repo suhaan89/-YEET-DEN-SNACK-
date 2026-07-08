@@ -2446,7 +2446,7 @@ local function buildReferral()
 	roundify(toggle, 12)
 	toggle.Parent = gui
 
-	local frame = makeWindow("👥 FREUNDE EINLADEN", Vector2.new(440, 330), Color3.fromRGB(120, 220, 240))
+	local frame = makeWindow("👥 FREUNDE & CODES", Vector2.new(440, 460), Color3.fromRGB(120, 220, 240))
 
 	makeLabel(frame, {
 		Position = UDim2.fromOffset(16, 44),
@@ -2516,6 +2516,71 @@ local function buildReferral()
 		TextSize = 14,
 		TextWrapped = true,
 	})
+
+	-- ── Promo-Codes (getrennt vom Referral-System!) ──
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 300),
+		Size = UDim2.new(1, -32, 0, 24),
+		Text = "🎟️ PROMO-CODE (von YouTube, TikTok & Co.)",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 200, 80),
+		TextScaled = false,
+		TextSize = 16,
+	})
+
+	local promoBox = Instance.new("TextBox")
+	promoBox.Position = UDim2.new(0, 16, 0, 330)
+	promoBox.Size = UDim2.new(1, -152, 0, 40)
+	promoBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	promoBox.Font = FONT
+	promoBox.TextSize = 18
+	promoBox.TextColor3 = Color3.new(1, 1, 1)
+	promoBox.PlaceholderText = "Code hier eintippen..."
+	promoBox.Text = ""
+	promoBox.ClearTextOnFocus = false
+	roundify(promoBox, 10)
+	promoBox.Parent = frame
+
+	local promoButton = Instance.new("TextButton")
+	promoButton.AnchorPoint = Vector2.new(1, 0)
+	promoButton.Position = UDim2.new(1, -16, 0, 330)
+	promoButton.Size = UDim2.fromOffset(112, 40)
+	promoButton.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+	promoButton.Font = FONT
+	promoButton.TextScaled = true
+	promoButton.Text = "EINLÖSEN"
+	promoButton.TextColor3 = Color3.new(1, 1, 1)
+	roundify(promoButton, 10)
+	promoButton.Parent = frame
+
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 376),
+		Size = UDim2.new(1, -32, 0, 40),
+		Text = "Jeder Code geht nur EINMAL pro Account. Neue Codes gibt's bei Updates & auf unseren Kanälen!",
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 13,
+		TextWrapped = true,
+	})
+
+	promoButton.Activated:Connect(function()
+		local code = promoBox.Text
+		if code:gsub("%s", "") == "" then
+			Ui.Toast("❌ Erst einen Code eintippen!")
+			return
+		end
+		task.spawn(function()
+			local ok, result = pcall(function()
+				return (Remotes.Get("RedeemPromoCode") :: RemoteFunction):InvokeServer(code)
+			end)
+			if ok and typeof(result) == "table" then
+				Ui.Toast((result.ok and "🎟️ " or "❌ ") .. result.msg)
+				if result.ok then
+					promoBox.Text = ""
+				end
+			end
+		end)
+	end)
 
 	local function refresh()
 		task.spawn(function()

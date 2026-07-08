@@ -513,6 +513,18 @@ local Config = {
 		{ Id = "Kristall", Name = "💎 Kristall-Körper", GemCost = 120, Color = Color3.fromRGB(150, 225, 255), Material = Enum.Material.Glass, Transparency = 0.35, Desc = "Durchsichtig, glänzend, unbezahlbar (fast)." },
 	},
 
+	-- ══ Promo-Codes ══
+	-- Codes für YouTuber/TikTok-Shoutouts & Updates: einfach hier neue Zeilen
+	-- ergänzen (KEINE Code-Änderung nötig), alte per Active=false abschalten.
+	-- Jeder Account kann jeden Code nur EINMAL einlösen (im Profil gespeichert).
+	-- Reward-Typen: Cash {Amount}, Egg {Egg="Basic|Golden|Mutant|Juwel"},
+	-- Gems {Amount}, Trail {Trail="<Trail-Id>"}.
+	PromoCodes = {
+		{ Code = "YEETDENSNACK", Active = true, Reward = { Type = "Cash", Amount = 2500 } },
+		{ Code = "SCHOKOLADE", Active = true, Reward = { Type = "Egg", Egg = "Basic" } },
+		{ Code = "RELEASE", Active = true, Reward = { Type = "Egg", Egg = "Golden" } },
+	},
+
 	-- ══ Monetarisierung (Robux) ══
 	-- Developer Products (mehrfach kaufbar) + VIP-Gamepass. Alle Ids sind
 	-- PLATZHALTER (0), bis sie im Creator Dashboard angelegt sind – solange
