@@ -3283,7 +3283,11 @@ local function buildHelp()
 		"🏆 ACHIEVEMENTS (Pokal-Button): Meilensteine sammeln!",
 		"🤝 Mit Roblox-FREUNDEN im Server spielen = +10% Einkommen!",
 		"👥 FREUNDE EINLADEN (Button rechts): Code teilen = fette Belohnung!",
+		"🎟️ PROMO-CODES gibt's im selben Menü – von YouTube, TikTok & Co.!",
 		"🏡 BASIS-DEKO (Button rechts): Deko kaufen & aufstellen!",
+		"📅 TÄGLICH einloggen = Streak-Belohnungen (Button unten links)!",
+		"🏆 GLOBALE BESTENLISTEN: Tafeln am Spawn + Pokal-Button rechts!",
+		"👑 VIP & Boosts gibt's im 🛍️ ROBUX-SHOP (Button rechts)!",
 	}, "\n")
 
 	local body = Instance.new("TextLabel")

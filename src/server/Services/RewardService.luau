@@ -50,11 +50,29 @@ function RewardService.Init(services)
 	announceRemote = Remotes.Get("Announce") :: RemoteEvent
 	sfxRemote = Remotes.Get("Sfx") :: RemoteEvent
 
+	-- Private-Server-Besitzer freundlich begrüßen (das Spiel läuft in
+	-- Private Servers ohne Sonderfälle – Basen sind Claim-basiert, keine
+	-- Logik hängt an "8 Spieler"; hier gibt's nur den Ehren-Gruß).
+	local function greetPrivateOwner(player: Player)
+		if game.PrivateServerId ~= "" and game.PrivateServerOwnerId == player.UserId then
+			task.delay(6, function()
+				if player.Parent then
+					notifyRemote:FireClient(
+						player,
+						"🔒 Willkommen auf DEINEM Privat-Server! Lad Freunde ein – der Freundes-Bonus gilt hier auch!"
+					)
+				end
+			end)
+		end
+	end
+
 	Players.PlayerAdded:Connect(function(player)
 		lastGift[player] = os.clock()
+		greetPrivateOwner(player)
 	end)
 	for _, player in Players:GetPlayers() do
 		lastGift[player] = os.clock()
+		greetPrivateOwner(player)
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastGift[player] = nil
