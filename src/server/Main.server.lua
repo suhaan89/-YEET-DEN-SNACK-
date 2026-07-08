@@ -37,6 +37,7 @@ services.MonetizationService = require(servicesFolder.MonetizationService)
 services.PromoCodeService = require(servicesFolder.PromoCodeService)
 services.LeaderboardService = require(servicesFolder.LeaderboardService)
 services.DailyRewardService = require(servicesFolder.DailyRewardService)
+services.GroupBonusService = require(servicesFolder.GroupBonusService)
 services.GemService = require(servicesFolder.GemService)
 services.ParkourService = require(servicesFolder.ParkourService)
 services.AtmosphereService = require(servicesFolder.AtmosphereService)
@@ -66,6 +67,7 @@ services.MonetizationService.Init(services) -- nach Pet/BaseService (zahlt Eier 
 services.PromoCodeService.Init(services) -- nach Pet/GemService (zahlt Eier/Juwelen aus)
 services.LeaderboardService.Init(services) -- umhüllt PlayerService.AddCash (Lifetime-Tracking)
 services.DailyRewardService.Init(services) -- nach Pet/GemService (zahlt Eier/Juwelen aus)
+services.GroupBonusService.Init(services) -- Gruppen-Bonus (schläft bei GroupId 0)
 services.ParkourService.Init(services) -- nach GemService (Juwelen/Freischaltung)
 services.AtmosphereService.Init(services) -- Grafik-Politur: Lighting, Wolken, Map-Deko
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu

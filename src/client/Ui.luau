@@ -1353,6 +1353,40 @@ local function buildFriendBonus()
 	refresh()
 end
 
+-- ══════════ Gruppen-Bonus-Anzeige ══════════
+-- Badge unter dem Freundes-Bonus, solange man Gruppen-Mitglied ist
+-- (Datenquelle: "InGroup"-Attribut, setzt der GroupBonusService).
+
+local function buildGroupBonus()
+	local frame = Instance.new("Frame")
+	frame.Name = "GroupBonus"
+	frame.Position = UDim2.new(0, 12, 0, 194) -- unter FriendBonus (y=158, Höhe 30)
+	frame.Size = UDim2.fromOffset(190, 30)
+	frame.BackgroundColor3 = Color3.fromRGB(55, 45, 30)
+	frame.BackgroundTransparency = 0.25
+	frame.Visible = false
+	roundify(frame, 10)
+	frame.Parent = gui
+
+	local label = makeLabel(frame, {
+		Size = UDim2.new(1, -12, 1, -6),
+		Position = UDim2.fromOffset(6, 3),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 210, 130),
+	})
+
+	local function refresh()
+		local active = player:GetAttribute("InGroup") == true
+		frame.Visible = active
+		if active then
+			label.Text = ("🏷️ Gruppen-Bonus: +%d%%"):format(Config.GroupBonusPercent * 100)
+		end
+	end
+	player:GetAttributeChangedSignal("InGroup"):Connect(refresh)
+	refresh()
+end
+
 -- ══════════ Debug-Menü (nur Entwickler) ══════════
 -- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
 -- Tabs (Spieler/Events/Diagnose/Server), Suchfeld, Ziel-Auswahl und F4-Toggle.
@@ -3379,6 +3413,7 @@ function Ui.Build()
 	buildMergeUi()
 	buildSupremeBar()
 	buildFriendBonus()
+	buildGroupBonus()
 	buildChargeBar()
 	buildParkourHud()
 	buildSeasonPass()

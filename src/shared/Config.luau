@@ -102,6 +102,13 @@ local Config = {
 	-- Spawn-Rechteck: deckt Plaza + Straße + Wiese ab, spart Basen (z=±120) und Shops (z=±80) aus
 	GoldenSnackArea = { MinX = -200, MaxX = 200, MinZ = -60, MaxZ = 60 },
 
+	-- ══ Gruppen-Bonus ══
+	-- Mitglieder der Roblox-Gruppe kriegen dauerhaft +X% Tresor-Einkommen.
+	-- GroupId 0 = noch keine Gruppe angelegt -> Feature schläft komplett.
+	GroupId = 0, -- TODO: Roblox-Gruppe erstellen und Id hier eintragen!
+	GroupBonusPercent = 0.1, -- +10% aufs rohe Tresor-Einkommen für Mitglieder
+	GroupRecheckInterval = 120, -- Sekunden: Nicht-Mitglieder erneut prüfen (Beitritt während der Session)
+
 	-- ══ Freunde-Bonus ══
 	-- Spielt ein Roblox-Freund gleichzeitig im selben Server, bekommen BEIDE
 	-- einen passiven Einkommens-Boost aufs rohe Tresor-Einkommen (FriendService).
