@@ -513,6 +513,18 @@ local Config = {
 		{ Id = "Kristall", Name = "💎 Kristall-Körper", GemCost = 120, Color = Color3.fromRGB(150, 225, 255), Material = Enum.Material.Glass, Transparency = 0.35, Desc = "Durchsichtig, glänzend, unbezahlbar (fast)." },
 	},
 
+	-- ══ Globale Bestenlisten ══
+	-- Server-übergreifende Top-Listen über OrderedDataStores. Intervalle
+	-- bewusst träge (DataStore-Budget!): Schreiben alle 2 Min pro Spieler,
+	-- Lesen alle 90 Sek pro Board.
+	Leaderboard = {
+		CashStore = "YeetDenSnack_LB_LifetimeCash_v1",
+		RebirthStore = "YeetDenSnack_LB_Rebirths_v1",
+		TopCount = 20,
+		WriteInterval = 120, -- Sekunden zwischen zwei Score-Uploads
+		ReadInterval = 90, -- Sekunden zwischen zwei Top-Listen-Downloads
+	},
+
 	-- ══ Promo-Codes ══
 	-- Codes für YouTuber/TikTok-Shoutouts & Updates: einfach hier neue Zeilen
 	-- ergänzen (KEINE Code-Änderung nötig), alte per Active=false abschalten.

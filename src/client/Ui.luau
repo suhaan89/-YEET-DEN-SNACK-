@@ -2787,6 +2787,102 @@ local function buildHousing()
 	end)
 end
 
+-- ══════════ Globale Bestenlisten ══════════
+-- Zeigt die vom Server gecachten Top-Listen (GetLeaderboards liest NUR den
+-- Server-Cache, kein DataStore-Hit). Eigener Eintrag wird hervorgehoben.
+
+local function buildLeaderboard()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "LeaderboardToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 324) -- unterster Button der rechten Leiste
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(220, 160, 60)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🏆"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🏆 GLOBALE BESTENLISTEN", Vector2.new(560, 480), Color3.fromRGB(255, 210, 60))
+
+	local function makeColumn(x: number, title: string, color: Color3): TextLabel
+		makeLabel(frame, {
+			Position = UDim2.new(x, 12, 0, 44),
+			Size = UDim2.new(0.5, -24, 0, 26),
+			Text = title,
+			TextColor3 = color,
+		})
+		local scroll = Instance.new("ScrollingFrame")
+		scroll.Position = UDim2.new(x, 12, 0, 76)
+		scroll.Size = UDim2.new(0.5, -24, 1, -88)
+		scroll.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+		scroll.BackgroundTransparency = 0.3
+		scroll.BorderSizePixel = 0
+		scroll.ScrollBarThickness = 6
+		scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		scroll.CanvasSize = UDim2.new()
+		roundify(scroll, 10)
+		scroll.Parent = frame
+		local body = Instance.new("TextLabel")
+		body.Position = UDim2.fromOffset(10, 8)
+		body.Size = UDim2.new(1, -20, 0, 0)
+		body.AutomaticSize = Enum.AutomaticSize.Y
+		body.BackgroundTransparency = 1
+		body.Font = FONT
+		body.TextSize = 16
+		body.TextColor3 = Color3.new(1, 1, 1)
+		body.TextXAlignment = Enum.TextXAlignment.Left
+		body.TextYAlignment = Enum.TextYAlignment.Top
+		body.TextWrapped = true
+		body.RichText = true
+		body.Text = "Lade..."
+		body.Parent = scroll
+		return body
+	end
+
+	local cashBody = makeColumn(0, "💰 REICHSTE (Lifetime)", Color3.fromRGB(255, 210, 60))
+	local rebirthBody = makeColumn(0.5, "🌟 MEISTE REBIRTHS", Color3.fromRGB(220, 120, 255))
+
+	local function renderList(body: TextLabel, list: any, suffix: string)
+		if typeof(list) ~= "table" or #list == 0 then
+			body.Text = "Noch keine Einträge –\nsei der Erste! 😎"
+			return
+		end
+		local lines = {}
+		for rank, entry in list do
+			local medal = if rank == 1 then "🥇" elseif rank == 2 then "🥈" elseif rank == 3 then "🥉" else rank .. "."
+			local line = ("%s %s – %s%s"):format(medal, tostring(entry.Name), formatNumber(tonumber(entry.Value) or 0), suffix)
+			if entry.UserId == player.UserId then
+				line = ('<font color="#FFD700">➤ %s</font>'):format(line)
+			end
+			table.insert(lines, line)
+		end
+		body.Text = table.concat(lines, "\n")
+	end
+
+	local function refresh()
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return (Remotes.Get("GetLeaderboards") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(data) ~= "table" then
+				return
+			end
+			renderList(cashBody, data.Cash, "💰")
+			renderList(rebirthBody, data.Rebirths, "🌟")
+		end)
+	end
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
 -- ══════════ Robux-Shop ══════════
 -- Developer Products + VIP-Gamepass. Der Client PROMPTET nur den Kauf –
 -- Auszahlung/Validierung macht der MonetizationService (ProcessReceipt).
@@ -3168,6 +3264,7 @@ function Ui.Build()
 	buildReferral()
 	buildHousing()
 	buildRobuxShop()
+	buildLeaderboard()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

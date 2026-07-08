@@ -35,6 +35,7 @@ services.ReferralService = require(servicesFolder.ReferralService)
 services.HousingService = require(servicesFolder.HousingService)
 services.MonetizationService = require(servicesFolder.MonetizationService)
 services.PromoCodeService = require(servicesFolder.PromoCodeService)
+services.LeaderboardService = require(servicesFolder.LeaderboardService)
 services.GemService = require(servicesFolder.GemService)
 services.ParkourService = require(servicesFolder.ParkourService)
 services.AtmosphereService = require(servicesFolder.AtmosphereService)
@@ -62,6 +63,7 @@ services.ReferralService.Init(services) -- nach PetService (zahlt Eier als Präm
 services.HousingService.Init(services) -- nach BaseService (liest GetBaseOf)
 services.MonetizationService.Init(services) -- nach Pet/BaseService (zahlt Eier aus, liest Tresor)
 services.PromoCodeService.Init(services) -- nach Pet/GemService (zahlt Eier/Juwelen aus)
+services.LeaderboardService.Init(services) -- umhüllt PlayerService.AddCash (Lifetime-Tracking)
 services.ParkourService.Init(services) -- nach GemService (Juwelen/Freischaltung)
 services.AtmosphereService.Init(services) -- Grafik-Politur: Lighting, Wolken, Map-Deko
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
