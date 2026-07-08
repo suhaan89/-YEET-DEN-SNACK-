@@ -179,14 +179,17 @@ local function blinkPad(ctx: Ctx, forward: number, dy: number, width: number, de
 	})
 end
 
--- Fahrende Plattform: überbrückt `forward` Studs, pendelt entlang der
--- Laufrichtung (axis="forward") oder seitlich (axis="side") um ±amp.
+-- Fahrende Plattform: Pendel-Mitte liegt `forward/2` Studs voraus, pendelt
+-- entlang der Laufrichtung (axis="forward") oder seitlich (axis="side") um
+-- ±amp. WICHTIG: Der Cursor rückt nur bis zur Pendel-MITTE vor – so landet
+-- das nächste normale pad() (11-13 Studs) direkt hinter dem Pendel-Endpunkt
+-- und bleibt erreichbar.
 local function mover(ctx: Ctx, forward: number, dy: number, width: number, depth: number, axis: string, amp: number, speed: number, phase: number)
-	local mid = ctx.Pos + ctx.Dir * (forward / 2) + Vector3.new(0, dy / 2, 0)
+	ctx.Pos += ctx.Dir * (forward / 2) + Vector3.new(0, dy, 0)
 	local part = makePart(ctx, {
 		Name = "Mover",
 		Size = orientedSize(ctx, width, 1, depth),
-		Position = mid - Vector3.new(0, 0.5, 0),
+		Position = ctx.Pos - Vector3.new(0, 0.5, 0),
 		Color = Color3.fromRGB(150, 220, 255),
 		Material = Enum.Material.Neon,
 	})
@@ -199,7 +202,6 @@ local function mover(ctx: Ctx, forward: number, dy: number, width: number, depth
 		Phase = phase,
 		Offset = offset,
 	})
-	ctx.Pos += ctx.Dir * forward + Vector3.new(0, dy, 0)
 end
 
 -- Checkpoint: grünes Neon-Pad, Respawn-Punkt bei Sturz/Lava (nur dieser Lauf)

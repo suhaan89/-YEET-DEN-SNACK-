@@ -518,7 +518,7 @@ local function buildHub()
 	local sign = makeHubPart(folder, {
 		Name = "HubSign",
 		Size = Vector3.new(26, 4, 1),
-		Position = HUB_CENTER + Vector3.new(0, 14, 14),
+		Position = HUB_CENTER + Vector3.new(0, 17, 17),
 		Color = Color3.fromRGB(25, 25, 35),
 		Material = Enum.Material.Neon,
 	})
