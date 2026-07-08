@@ -137,7 +137,7 @@ local function updateDisplay(base)
 		local level = profile and profile.BaseLevel or 1
 		local levelDef = Config.BaseLevelDef(level)
 		local count = profile and #profile.Vault or 0
-		local limit = Config.VaultLimit(profile and profile.Rebirths or 0, level)
+		local limit = Config.VaultLimit(profile and profile.Rebirths or 0, level, profile and profile.ExtraVaultSlots or 0)
 		local income = math.floor(getTotalIncome(owner))
 		base.NameLabel.Text = ("%s  %s"):format(levelDef.Label, owner.Name)
 		base.InfoLabel.Text = ("🍫 %d/%d Snacks  |  %d💰/s"):format(count, limit, income)
@@ -506,7 +506,7 @@ function BaseService.AddToVault(owner: Player, snackName: string): boolean
 	if not profile then
 		return false
 	end
-	if #profile.Vault >= Config.VaultLimit(profile.Rebirths, profile.BaseLevel) then
+	if #profile.Vault >= Config.VaultLimit(profile.Rebirths, profile.BaseLevel, profile.ExtraVaultSlots) then
 		return false
 	end
 	table.insert(profile.Vault, snackName)
@@ -559,7 +559,7 @@ function BaseService.TryDropSnack(player: Player, base)
 		("🗑️ '%s' rausgeworfen! (%d/%d Plätze belegt)"):format(
 			snackName,
 			#profile.Vault,
-			Config.VaultLimit(profile.Rebirths, profile.BaseLevel)
+			Config.VaultLimit(profile.Rebirths, profile.BaseLevel, profile.ExtraVaultSlots)
 		)
 	)
 end

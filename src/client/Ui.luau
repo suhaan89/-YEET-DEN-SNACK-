@@ -2722,6 +2722,196 @@ local function buildHousing()
 	end)
 end
 
+-- ══════════ Robux-Shop ══════════
+-- Developer Products + VIP-Gamepass. Der Client PROMPTET nur den Kauf –
+-- Auszahlung/Validierung macht der MonetizationService (ProcessReceipt).
+-- Solange eine Id noch 0 ist (Platzhalter), gibt's statt Kauf einen Hinweis.
+
+local function buildRobuxShop()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "RobuxShopToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 272) -- unter Hilfe/Pass/Achievements/Referral/Housing
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(60, 180, 90)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🛍️"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🛍️ ROBUX-SHOP", Vector2.new(460, 470), Color3.fromRGB(120, 240, 150))
+
+	-- Boost-Status oben (zählt live runter, solange das Fenster offen ist)
+	local boostLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 22),
+		Text = "",
+		TextColor3 = Color3.fromRGB(255, 220, 80),
+		TextScaled = false,
+		TextSize = 15,
+	})
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 70)
+	list.Size = UDim2.new(1, -24, 1, -82)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- Eine Kauf-Zeile (Produkt oder Gamepass)
+	local function makeBuyRow(order: number, name: string, desc: string, color: Color3, onBuy: () -> (), priceFetch: (() -> string?)?)
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 58)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = order
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = name,
+			TextColor3 = color,
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -140, 0, 20),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = desc,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+			TextWrapped = true,
+		})
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 42)
+		button.BackgroundColor3 = Color3.fromRGB(60, 180, 90)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = "R$ …"
+		roundify(button, 10)
+		button.Parent = row
+		button.Activated:Connect(onBuy)
+
+		-- Preis asynchron nachladen (Marketplace-API kann zicken -> Fallback)
+		task.spawn(function()
+			local text = priceFetch and priceFetch() or nil
+			if button.Parent then
+				button.Text = text or "KAUFEN"
+			end
+		end)
+		return button
+	end
+
+	-- ── VIP-Gamepass ──
+	local vipButton = makeBuyRow(
+		1,
+		"👑 VIP-PASS",
+		("Für immer +%d%% Tresor-Einkommen, 👑-Nametag & Zugang zur VIP-LOUNGE!"):format(
+			Config.Monetization.VipCashBonusPercent * 100
+		),
+		Color3.fromRGB(255, 215, 0),
+		function()
+			if player:GetAttribute("IsVip") == true then
+				Ui.Toast("👑 Du BIST schon VIP!")
+				return
+			end
+			if Config.Monetization.VipGamepassId <= 0 then
+				Ui.Toast("⚠️ VIP-Pass kommt bald! (Gamepass noch nicht eingerichtet)")
+				return
+			end
+			MarketplaceService:PromptGamePassPurchase(player, Config.Monetization.VipGamepassId)
+		end,
+		function(): string?
+			if Config.Monetization.VipGamepassId <= 0 then
+				return "BALD!"
+			end
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(Config.Monetization.VipGamepassId, Enum.InfoType.GamePass)
+			end)
+			if ok and info and info.PriceInRobux then
+				return ("R$ %d"):format(info.PriceInRobux)
+			end
+			return nil
+		end
+	)
+
+	-- ── Developer Products ──
+	for i, def in Config.Monetization.Products do
+		makeBuyRow(1 + i, def.Name, def.Desc, Color3.new(1, 1, 1), function()
+			if def.ProductId <= 0 then
+				Ui.Toast("⚠️ Kommt bald! (Produkt noch nicht eingerichtet)")
+				return
+			end
+			MarketplaceService:PromptProductPurchase(player, def.ProductId)
+		end, function(): string?
+			if def.ProductId <= 0 then
+				return "BALD!"
+			end
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(def.ProductId, Enum.InfoType.Product)
+			end)
+			if ok and info and info.PriceInRobux then
+				return ("R$ %d"):format(info.PriceInRobux)
+			end
+			return nil
+		end)
+	end
+
+	local function refreshBoostLabel()
+		local until_ = player:GetAttribute("BoostUntil")
+		local now = DateTime.now().UnixTimestamp
+		if typeof(until_) == "number" and until_ > now then
+			local left = until_ - now
+			boostLabel.Text = ("⚡ 2x-Boost AKTIV – noch %d:%02d Minuten!"):format(left // 60, left % 60)
+		elseif player:GetAttribute("IsVip") == true then
+			boostLabel.Text = "👑 VIP aktiv – danke für deinen Support!"
+		else
+			boostLabel.Text = "Unterstütze das Spiel und hol dir fette Vorteile! 💚"
+		end
+	end
+
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			if frame.Visible then
+				refreshBoostLabel()
+			end
+		end
+	end)
+	player:GetAttributeChangedSignal("IsVip"):Connect(function()
+		if player:GetAttribute("IsVip") == true then
+			vipButton.Text = "✓ AKTIV"
+			vipButton.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+		end
+	end)
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refreshBoostLabel()
+			if player:GetAttribute("IsVip") == true then
+				vipButton.Text = "✓ AKTIV"
+				vipButton.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+			end
+		end
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -2912,6 +3102,7 @@ function Ui.Build()
 	buildAchievements()
 	buildReferral()
 	buildHousing()
+	buildRobuxShop()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

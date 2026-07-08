@@ -513,6 +513,50 @@ local Config = {
 		{ Id = "Kristall", Name = "💎 Kristall-Körper", GemCost = 120, Color = Color3.fromRGB(150, 225, 255), Material = Enum.Material.Glass, Transparency = 0.35, Desc = "Durchsichtig, glänzend, unbezahlbar (fast)." },
 	},
 
+	-- ══ Monetarisierung (Robux) ══
+	-- Developer Products (mehrfach kaufbar) + VIP-Gamepass. Alle Ids sind
+	-- PLATZHALTER (0), bis sie im Creator Dashboard angelegt sind – solange
+	-- eine Id 0 ist, zeigt der Kauf-Button nur einen Hinweis-Toast.
+	-- Quittierte Käufe (PurchaseId) landen im Receipt-DataStore, damit
+	-- ProcessReceipt garantiert nur EINMAL auszahlt.
+	Monetization = {
+		ReceiptDataStore = "YeetDenSnack_Receipts_v1",
+		VipGamepassId = 0, -- TODO: VIP-Gamepass im Creator Dashboard anlegen!
+		VipCashBonusPercent = 0.1, -- dauerhafter Bonus aufs rohe Tresor-Einkommen
+		BoostBonusPercent = 1, -- "2x Cash" = +100% Tresor-Einkommen solange aktiv
+		Products = {
+			{
+				Id = "Boost2x",
+				Name = "⚡ 2x Tresor-Cash (30 Min)",
+				Desc = "Doppeltes Tresor-Einkommen für 30 Minuten – übersteht sogar Rejoins!",
+				ProductId = 0, -- TODO: Developer Product anlegen und Id eintragen!
+				DurationSeconds = 1800,
+			},
+			{
+				Id = "VaultSell",
+				Name = "💸 Tresor-Sofortverkauf",
+				Desc = "Verkauft ALLE Tresor-Snacks sofort (Wert: 120 Sekunden Einkommen pro Snack).",
+				ProductId = 0,
+				SellSecondsWorth = 120,
+			},
+			{
+				Id = "VaultSlots",
+				Name = "🧰 +10 Tresor-Plätze (für immer)",
+				Desc = "Dauerhaft 10 zusätzliche Tresor-Plätze – überlebt sogar Rebirths!",
+				ProductId = 0,
+				Slots = 10,
+			},
+			{
+				Id = "EggBundle",
+				Name = "🥚 Gold-Ei-Bundle (3 Stück)",
+				Desc = "Drei Gold-Eier, sofort geöffnet – drück die Daumen!",
+				ProductId = 0,
+				Egg = "Golden",
+				Count = 3,
+			},
+		},
+	},
+
 	-- ══ Debug/Test-Menü ══
 	-- Im Studio ist das Menü IMMER sichtbar. Für Team Test/Live-Server hier UserIds eintragen:
 	DebugUserIds = {
@@ -539,11 +583,19 @@ function Config.BaseLevelDef(level: number)
 	return Config.BaseLevels[math.clamp(level, 1, #Config.BaseLevels)]
 end
 
--- Maximale Tresor-Plätze bei `rebirths` Rebirths und Basis-Level `baseLevel`
-function Config.VaultLimit(rebirths: number, baseLevel: number?): number
+-- Maximale Tresor-Plätze bei `rebirths` Rebirths und Basis-Level `baseLevel`.
+-- `extraSlots` = dauerhaft gekaufte Zusatz-Plätze (Robux-Shop, überlebt Rebirths).
+function Config.VaultLimit(rebirths: number, baseLevel: number?, extraSlots: number?): number
 	return Config.VaultLimitBase
 		+ rebirths * Config.VaultLimitPerRebirth
 		+ Config.BaseLevelDef(baseLevel or 1).BonusSlots
+		+ (extraSlots or 0)
+end
+
+-- Produkt-Lookup nach interner Id bzw. nach Roblox-ProductId
+Config.MonetizationProductsById = {} :: { [string]: any }
+for _, def in Config.Monetization.Products do
+	Config.MonetizationProductsById[def.Id] = def
 end
 
 -- Erfolgschance für einen Merge mit `count` gleichen Snacks (Client-Anzeige + Server-Wurf

@@ -585,7 +585,7 @@ local function inspectPlayer(target: Player): { string }
 		add("── Profil ──")
 		add("Cash: %.1f | Rebirths: %d | TotalYeets: %d", profile.Cash, profile.Rebirths, profile.TotalYeets)
 		add("BaseLevel: %d (%s)", profile.BaseLevel, Config.BaseLevelDef(profile.BaseLevel).Label)
-		add("Tresor: %d/%d Snacks", #profile.Vault, Config.VaultLimit(profile.Rebirths, profile.BaseLevel))
+		add("Tresor: %d/%d Snacks", #profile.Vault, Config.VaultLimit(profile.Rebirths, profile.BaseLevel, profile.ExtraVaultSlots))
 		local petCount = 0
 		for _ in profile.Pets do
 			petCount += 1
