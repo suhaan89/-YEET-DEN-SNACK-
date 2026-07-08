@@ -33,6 +33,8 @@ services.AchievementService = require(servicesFolder.AchievementService)
 services.FriendService = require(servicesFolder.FriendService)
 services.ReferralService = require(servicesFolder.ReferralService)
 services.HousingService = require(servicesFolder.HousingService)
+services.GemService = require(servicesFolder.GemService)
+services.ParkourService = require(servicesFolder.ParkourService)
 services.AtmosphereService = require(servicesFolder.AtmosphereService)
 services.DebugService = require(servicesFolder.DebugService)
 
@@ -46,6 +48,7 @@ services.SlapService.Init(services)
 services.TruckService.Init(services)
 services.ShopService.Init(services)
 services.RewardService.Init(services)
+services.GemService.Init(services) -- vor Pet/Style (die verkaufen gegen Juwelen)
 services.PetService.Init(services)
 services.SeasonPassService.Init(services) -- nach PetService (zahlt Eier als Belohnung aus)
 services.StyleService.Init(services)
@@ -55,6 +58,7 @@ services.AchievementService.Init(services) -- nach BaseService (umhüllt TryCrac
 services.FriendService.Init(services)
 services.ReferralService.Init(services) -- nach PetService (zahlt Eier als Prämie aus)
 services.HousingService.Init(services) -- nach BaseService (liest GetBaseOf)
+services.ParkourService.Init(services) -- nach GemService (Juwelen/Freischaltung)
 services.AtmosphereService.Init(services) -- Grafik-Politur: Lighting, Wolken, Map-Deko
 services.DebugService.Init(services) -- als Letztes: greift auf alle anderen Services zu
 
