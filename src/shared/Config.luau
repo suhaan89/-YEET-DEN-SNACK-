@@ -370,6 +370,149 @@ local Config = {
 		{ Id = "Bonbon", Name = "🍬 Bonbon-Blizzard", Color = Color3.fromRGB(120, 220, 255), Rainbow = true, Seasonal = true, Desc = "Season-1-PREMIUM: wirbelnder Bonbon-Sturm!" },
 	},
 
+	-- ══ Parkour-Minigame & Juwelen ══
+	-- 8 Parcours in FESTER Reihenfolge (5 kurze, dann 3 lange), betreten über
+	-- den Portal-Hub südlich des Spawns (ParkourService baut Hub + Arenen).
+	-- Freischaltung: Parcours n+1 öffnet sich erst nach Abschluss von Parcours n.
+	-- Tiers: aufsteigend nach Time sortiert – die erste Stufe, deren Time-Limit
+	-- die gelaufene Zeit noch einhält, zählt. Sonst gibt's die Base-Belohnung.
+	-- Cash skaliert mit dem Rebirth-Multiplikator, Juwelen NICHT (bleiben rar!).
+	-- MasterTime: ALLE 8 darunter -> exklusiver "Juwelensturm"-Trail (einmalig).
+	ParkourDataStore = "YeetDenSnack_Parkour_v1",
+	ParkourReturnDelay = 3, -- Sekunden Ergebnis angucken, dann Rück-Teleport zum Hub
+	ParkourReadyTimeout = 60, -- Sekunden von Teleport bis Startlinie, sonst automatisch zurück
+	ParkourCourses = {
+		-- ── Die 5 kurzen (ca. 15-25s bei gutem Können) ──
+		{
+			Id = "Zuckerstange",
+			Name = "🍭 Zuckerstangen-Sprint",
+			Short = true,
+			Color = Color3.fromRGB(255, 90, 110),
+			Desc = "Breite Plattformen, kleine Hüpfer – der Einstieg.",
+			Cooldown = 60,
+			MaxTime = 120,
+			MasterTime = 18,
+			BaseCash = 50,
+			BaseGems = 1,
+			Tiers = { { Time = 15, Cash = 120, Gems = 3 }, { Time = 25, Cash = 80, Gems = 2 } },
+		},
+		{
+			Id = "Schoko",
+			Name = "🍫 Schoko-Hüpfturm",
+			Short = true,
+			Color = Color3.fromRGB(120, 72, 30),
+			Desc = "Höhenstufen und heiße Schoko-Lava – nicht reintreten!",
+			Cooldown = 75,
+			MaxTime = 120,
+			MasterTime = 22,
+			BaseCash = 70,
+			BaseGems = 1,
+			Tiers = { { Time = 18, Cash = 180, Gems = 4 }, { Time = 30, Cash = 120, Gems = 3 } },
+		},
+		{
+			Id = "Bonbon",
+			Name = "🍬 Bonbon-Wirbel",
+			Short = true,
+			Color = Color3.fromRGB(120, 220, 255),
+			Desc = "Rotierende Zuckerstangen-Balken – Timing ist alles!",
+			Cooldown = 90,
+			MaxTime = 150,
+			MasterTime = 25,
+			BaseCash = 90,
+			BaseGems = 2,
+			Tiers = { { Time = 20, Cash = 260, Gems = 5 }, { Time = 35, Cash = 170, Gems = 3 } },
+		},
+		{
+			Id = "Waffel",
+			Name = "🧇 Waffel-Wackelweg",
+			Short = true,
+			Color = Color3.fromRGB(230, 180, 90),
+			Desc = "Blinkende Waffel-Platten – weg, wenn du zu langsam bist!",
+			Cooldown = 90,
+			MaxTime = 150,
+			MasterTime = 28,
+			BaseCash = 120,
+			BaseGems = 2,
+			Tiers = { { Time = 22, Cash = 360, Gems = 7 }, { Time = 40, Cash = 240, Gems = 4 } },
+		},
+		{
+			Id = "Donut",
+			Name = "🍩 Donut-Dash",
+			Short = true,
+			Color = Color3.fromRGB(255, 150, 200),
+			Desc = "Fahrende Donuts, schmale Stege UND Wirbel – alles auf einmal!",
+			Cooldown = 120,
+			MaxTime = 180,
+			MasterTime = 32,
+			BaseCash = 160,
+			BaseGems = 3,
+			Tiers = { { Time = 25, Cash = 500, Gems = 9 }, { Time = 45, Cash = 330, Gems = 6 } },
+		},
+		-- ── Die 3 langen (ca. 45-120s bei gutem Können, mit Checkpoints) ──
+		{
+			Id = "Karamell",
+			Name = "🍮 Karamell-Kletterturm",
+			Short = false,
+			Color = Color3.fromRGB(230, 170, 80),
+			Desc = "Der große Turm: klettern, springen, nicht runterschauen!",
+			Cooldown = 180,
+			MaxTime = 300,
+			MasterTime = 75,
+			BaseCash = 400,
+			BaseGems = 6,
+			Tiers = { { Time = 60, Cash = 1200, Gems = 16 }, { Time = 100, Cash = 800, Gems = 11 } },
+		},
+		{
+			Id = "Lakritz",
+			Name = "🌪️ Lakritz-Labyrinth",
+			Short = false,
+			Color = Color3.fromRGB(60, 55, 65),
+			Desc = "Schmale Lakritz-Stege, Wirbel und Blink-Passagen im Dunkeln.",
+			Cooldown = 240,
+			MaxTime = 360,
+			MasterTime = 90,
+			BaseCash = 600,
+			BaseGems = 8,
+			Tiers = { { Time = 75, Cash = 1800, Gems = 22 }, { Time = 120, Cash = 1200, Gems = 15 } },
+		},
+		{
+			Id = "Vulkan",
+			Name = "🌋 Schoko-Vulkan",
+			Short = false,
+			Color = Color3.fromRGB(255, 100, 40),
+			Desc = "Das Finale: Lava-Sprints, Wirbel-Gauntlet, Wackel-Wände. Viel Glück.",
+			Cooldown = 300,
+			MaxTime = 420,
+			MasterTime = 110,
+			BaseCash = 900,
+			BaseGems = 12,
+			Tiers = { { Time = 90, Cash = 2800, Gems = 32 }, { Time = 150, Cash = 1900, Gems = 21 } },
+		},
+	},
+
+	-- ══ Juwelen-Shop (NUR mit 💎 kaufbar – Juwelen gibt's NUR im Parkour!) ══
+	-- GemEggs: wie Config.Eggs, aber GemCost statt Cost (deutlich bessere Chancen).
+	GemEggs = {
+		{
+			Id = "Juwel",
+			Name = "💎 Juwelen-Ei",
+			GemCost = 45,
+			Color = Color3.fromRGB(120, 230, 255),
+			Desc = "Funkelt wie verrückt. KEINE Commons, fette Legendary-Chance!",
+			Chances = { Rare = 25, Epic = 40, Legendary = 27, Mythic = 8 },
+		},
+	},
+	-- GemTrails/GemSkins: exklusive Cosmetics (RewardOnly = nicht kaufbar,
+	-- gibt's nur für die Parkour-Meisterschaft – alle 8 unter MasterTime).
+	GemTrails = {
+		{ Id = "Saphir", Name = "💠 Saphir-Schimmer", GemCost = 30, Color = Color3.fromRGB(80, 150, 255), Desc = "Kühles Funkeln für flinke Füße." },
+		{ Id = "Diamant", Name = "💎 Diamant-Staub", GemCost = 75, Color = Color3.fromRGB(200, 245, 255), Desc = "Du läufst, es glitzert. Purer Protz." },
+		{ Id = "Juwelensturm", Name = "🌈💎 Juwelensturm", RewardOnly = true, Rainbow = true, Color = Color3.fromRGB(150, 220, 255), Desc = "Meister-Belohnung: alle 8 Parcours unter der Meister-Zeit!" },
+	},
+	GemSkins = {
+		{ Id = "Kristall", Name = "💎 Kristall-Körper", GemCost = 120, Color = Color3.fromRGB(150, 225, 255), Material = Enum.Material.Glass, Transparency = 0.35, Desc = "Durchsichtig, glänzend, unbezahlbar (fast)." },
+	},
+
 	-- ══ Debug/Test-Menü ══
 	-- Im Studio ist das Menü IMMER sichtbar. Für Team Test/Live-Server hier UserIds eintragen:
 	DebugUserIds = {
@@ -439,6 +582,29 @@ end
 Config.EggsById = {} :: { [string]: any }
 for _, def in Config.Eggs do
 	Config.EggsById[def.Id] = def
+end
+-- Juwelen-Eier laufen über dieselbe Id-Map (GrantEgg/Chancen-UI funktionieren
+-- damit ohne Sonderfälle) – bezahlt wird nur anders (GemCost statt Cost).
+for _, def in Config.GemEggs do
+	Config.EggsById[def.Id] = def
+end
+
+Config.ParkourCoursesById = {} :: { [string]: any }
+Config.ParkourCourseIndex = {} :: { [string]: number } -- Id -> Position in der Kette
+for index, def in Config.ParkourCourses do
+	Config.ParkourCoursesById[def.Id] = def
+	Config.ParkourCourseIndex[def.Id] = index
+end
+
+-- Belohnung für einen Parkour-Lauf: beste Tier-Stufe, deren Zeitlimit gehalten
+-- wurde, sonst Base. Server-Vergabe und Client-Anzeige nutzen dieselbe Funktion.
+function Config.ParkourReward(courseDef: any, time: number): (number, number)
+	for _, tier in courseDef.Tiers do
+		if time <= tier.Time then
+			return tier.Cash, tier.Gems
+		end
+	end
+	return courseDef.BaseCash, courseDef.BaseGems
 end
 
 Config.EggPetsById = {} :: { [string]: any }

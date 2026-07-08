@@ -16,6 +16,8 @@ local EVENTS = {
 	"Sfx", -- Server -> alle Clients: Sound abspielen (name, position?)
 	"OpenShop", -- Server -> ein Client: Shop-UI öffnen (shopId: "Upgrade"|"Pets"|"Style"|"Merge")
 	"AchievementUnlocked", -- Server -> ein Client: Achievement-Popup (name, desc)
+	"ParkourResult", -- Server -> ein Client: Lauf-Ergebnis {Name, Time, Cash, Gems, ServerRecord, PersonalBest}
+	"ParkourLeave", -- Client -> Server: Parcours freiwillig verlassen (zurück zum Hub, keine Belohnung)
 }
 
 local FUNCTIONS = {
