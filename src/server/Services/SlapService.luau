@@ -66,6 +66,9 @@ local function onSlap(player: Player)
 	if player:GetAttribute("Snackified") then
 		return -- Snacks slappen nicht 💀
 	end
+	if player:GetAttribute("ParkourCourse") ~= nil then
+		return -- im Parkour wird gerannt, nicht geprügelt
+	end
 
 	lastSlap[player] = now
 
@@ -74,7 +77,8 @@ local function onSlap(player: Player)
 	local closest: Player? = nil
 	local closestDist = Config.SlapRange + (if typeof(rangeBonus) == "number" then rangeBonus else 0)
 	for _, other in Players:GetPlayers() do
-		if other ~= player then
+		-- Parkour-Läufer sind tabu (kein Griefing in den Arenen)
+		if other ~= player and other:GetAttribute("ParkourCourse") == nil then
 			local otherRoot = other.Character and other.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 			if otherRoot then
 				local dist = (otherRoot.Position - root.Position).Magnitude

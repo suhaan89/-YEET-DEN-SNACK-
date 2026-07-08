@@ -16,7 +16,7 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local StyleService = {}
 
-local DataService, PlayerService -- in Init verdrahtet
+local DataService, PlayerService, GemService -- in Init verdrahtet
 
 local trailDefsById: { [string]: any } = {}
 for _, def in Config.Trails do
@@ -27,9 +27,17 @@ end
 for _, def in Config.SeasonTrails do
 	trailDefsById[def.Id] = def
 end
+-- Juwelen-Trails: kaufbar NUR mit 💎 (GemCost) bzw. als Parkour-Meister-
+-- Belohnung (RewardOnly – vergibt der ParkourService direkt in profile.Trails)
+for _, def in Config.GemTrails do
+	trailDefsById[def.Id] = def
+end
 
 local skinDefsById: { [string]: any } = {}
 for _, def in Config.Skins do
+	skinDefsById[def.Id] = def
+end
+for _, def in Config.GemSkins do
 	skinDefsById[def.Id] = def
 end
 
@@ -168,7 +176,14 @@ local function buyTrail(player: Player, trailId: any)
 	if def.Seasonal then
 		return { ok = false, msg = "Den gibt's nur als Season-Pass-Belohnung!" }
 	end
-	if not PlayerService.TrySpend(player, def.Cost) then
+	if def.RewardOnly then
+		return { ok = false, msg = "Nur für Parkour-MEISTER: alle 8 Parcours unter der Meister-Zeit!" }
+	end
+	if def.GemCost then
+		if not GemService.TrySpendGems(player, def.GemCost) then
+			return { ok = false, msg = ("Zu wenig Juwelen! (%d💎 nötig – ab in den Parkour!)"):format(def.GemCost) }
+		end
+	elseif not PlayerService.TrySpend(player, def.Cost) then
 		return { ok = false, msg = ("Zu wenig Cash! (%d💰 nötig)"):format(def.Cost) }
 	end
 	profile.Trails[trailId] = true
@@ -211,7 +226,11 @@ local function buySkin(player: Player, skinId: any)
 		return { ok = false, msg = "Den Skin hast du schon!" }
 	end
 	local def = skinDefsById[skinId]
-	if not PlayerService.TrySpend(player, def.Cost) then
+	if def.GemCost then
+		if not GemService.TrySpendGems(player, def.GemCost) then
+			return { ok = false, msg = ("Zu wenig Juwelen! (%d💎 nötig – ab in den Parkour!)"):format(def.GemCost) }
+		end
+	elseif not PlayerService.TrySpend(player, def.Cost) then
 		return { ok = false, msg = ("Zu wenig Cash! (%d💰 nötig)"):format(def.Cost) }
 	end
 	profile.Skins[skinId] = true
@@ -246,7 +265,8 @@ end
 
 function StyleService.Init(services)
 	DataService = services.DataService
-	PlayerService = services.PlayerService;
+	PlayerService = services.PlayerService
+	GemService = services.GemService;
 
 	(Remotes.Get("BuyTrail") :: RemoteFunction).OnServerInvoke = buyTrail;
 	(Remotes.Get("EquipTrail") :: RemoteFunction).OnServerInvoke = equipTrail;

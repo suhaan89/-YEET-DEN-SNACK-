@@ -163,6 +163,33 @@ local COMMANDS = {
 		end,
 	},
 	{
+		Id = "AddGems",
+		Label = "💎 Juwelen ADDIEREN ...",
+		Category = "Spieler",
+		Arg = { Default = 100 },
+		Handler = function(_caller, target, services, value)
+			services.GemService.AddGems(target, math.floor(value))
+			return ("%+d💎 für %s!"):format(value, target.Name)
+		end,
+	},
+	{
+		Id = "ParkourUnlockAll",
+		Label = "🌀 Parkour: alle 8 freischalten",
+		Category = "Spieler",
+		Handler = function(_caller, target, services)
+			return services.ParkourService.DebugUnlockAll(target)
+		end,
+	},
+	{
+		Id = "ParkourResetCd",
+		Label = "🌀 Parkour: Cooldowns resetten",
+		Category = "Spieler",
+		Handler = function(_caller, target, services)
+			services.ParkourService.DebugResetCooldowns(target)
+			return ("Parkour-Cooldowns von %s zurückgesetzt."):format(target.Name)
+		end,
+	},
+	{
 		Id = "GodMode",
 		Label = "🛡️ God Mode togglen",
 		Category = "Spieler",

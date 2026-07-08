@@ -224,7 +224,13 @@ local function buyEgg(player: Player, eggId: any)
 		return { ok = false, msg = "Daten noch nicht geladen..." }
 	end
 	local eggDef = Config.EggsById[eggId]
-	if not PlayerService.TrySpend(player, eggDef.Cost) then
+	-- Juwelen-Ei (Config.GemEggs): kostet 💎 statt Cash – Juwelen gibt's nur im Parkour!
+	if eggDef.GemCost then
+		local gemService = servicesRef and servicesRef.GemService
+		if not gemService or not gemService.TrySpendGems(player, eggDef.GemCost) then
+			return { ok = false, msg = ("Zu wenig Juwelen! (%d💎 nötig – ab in den Parkour!)"):format(eggDef.GemCost) }
+		end
+	elseif not PlayerService.TrySpend(player, eggDef.Cost) then
 		return { ok = false, msg = ("Zu wenig Cash! (%d💰 nötig)"):format(eggDef.Cost) }
 	end
 
