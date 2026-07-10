@@ -24,6 +24,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local SnackTypes = require(ReplicatedStorage.Shared.SnackTypes)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local MeshVisuals = require(ReplicatedStorage.Shared.MeshVisuals)
 
 local TruckService = {}
 
@@ -60,6 +61,13 @@ local function buildTruck(isSupreme: boolean?): Model
 	body.CanCollide = false -- Kollision machen wir selbst (räumliche Abfrage)
 	body.Parent = model
 
+	-- ══ MESH-EINBAU: echte Truck-MeshId in src/shared/Config.luau eintragen ══
+	-- (Config.Meshes.Truck bzw. Config.Meshes.TruckSupreme, oben in der Datei).
+	-- Ist dort eine echte MeshId gesetzt, bekommt der Body das Mesh als Optik;
+	-- Platzhalter-Kabine und Schriftzug entfallen dann, weil ein richtiges
+	-- Truck-Mesh beides selbst mitbringt. Kollision/Fahrlogik bleiben gleich.
+	local hasMesh = MeshVisuals.Apply(body, if isSupreme then Config.Meshes.TruckSupreme else Config.Meshes.Truck)
+
 	local cab = Instance.new("Part")
 	cab.Name = "Cab"
 	cab.Size = Vector3.new(6, 6, 8)
@@ -67,22 +75,25 @@ local function buildTruck(isSupreme: boolean?): Model
 	cab.Material = Enum.Material.SmoothPlastic
 	cab.Anchored = true
 	cab.CanCollide = false
+	cab.Transparency = if hasMesh then 1 else 0 -- echtes Mesh hat die Kabine schon dran
 	cab.Parent = model
 
-	-- Schriftzug auf beiden Seiten
-	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
-		local gui = Instance.new("SurfaceGui")
-		gui.Face = face
-		gui.CanvasSize = Vector2.new(800, 300)
-		local label = Instance.new("TextLabel")
-		label.Size = UDim2.fromScale(1, 1)
-		label.BackgroundTransparency = 1
-		label.Text = if isSupreme then "☢️ MUTANTEN EXPRESS ☢️" else "🍫 SCHOKO EXPRESS 🍫"
-		label.TextScaled = true
-		label.Font = Enum.Font.FredokaOne
-		label.TextColor3 = if isSupreme then Color3.fromRGB(180, 255, 80) else Color3.fromRGB(255, 215, 0)
-		label.Parent = gui
-		gui.Parent = body
+	-- Schriftzug auf beiden Seiten (nur auf dem Platzhalter-Block sinnvoll)
+	if not hasMesh then
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face
+			gui.CanvasSize = Vector2.new(800, 300)
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.fromScale(1, 1)
+			label.BackgroundTransparency = 1
+			label.Text = if isSupreme then "☢️ MUTANTEN EXPRESS ☢️" else "🍫 SCHOKO EXPRESS 🍫"
+			label.TextScaled = true
+			label.Font = Enum.Font.FredokaOne
+			label.TextColor3 = if isSupreme then Color3.fromRGB(180, 255, 80) else Color3.fromRGB(255, 215, 0)
+			label.Parent = gui
+			gui.Parent = body
+		end
 	end
 
 	if isSupreme then

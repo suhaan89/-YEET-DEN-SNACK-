@@ -5,6 +5,23 @@
 ]]
 
 local Config = {
+	-- ══ Mesh-Optik: HIER echte MeshIds aus der Toolbox eintragen! ══
+	-- Solange "rbxassetid://0" (Platzhalter) drinsteht, bleibt die bisherige
+	-- simple Block-Optik aktiv – das Spiel läuft also auch ohne Meshes.
+	-- Sobald ein echtes Mesh eingetragen ist, wird es automatisch als Optik
+	-- auf das jeweilige Part gelegt (Kollision/Logik bleiben unverändert).
+	-- MeshScale = Faktor auf die Original-Größe des Meshes; im Spiel testen
+	-- und anpassen, bis es zur bisherigen Part-Größe passt.
+	-- (Snack-Meshes stehen NICHT hier, sondern in SnackTypes.luau → SnackTypes.Meshes!)
+	Meshes = {
+		-- Schoko-Truck (Body ≈ 22 x 9 x 9 Studs; Mesh sollte die Kabine gleich mitbringen)
+		Truck = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+		-- Mutanten-Express (giftgrüne Variante; darf gern dasselbe Mesh mit anderer Textur sein)
+		TruckSupreme = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+		-- Tresor in jeder Basis (Part ≈ 7 x 7 x 7 Studs)
+		Vault = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	},
+
 	-- ══ Schoko-Truck ══
 	TruckFirstSpawnDelay = 15, -- Sekunden nach Serverstart bis zum ersten Truck
 	TruckInterval = 180, -- Sekunden zwischen Truck-Events

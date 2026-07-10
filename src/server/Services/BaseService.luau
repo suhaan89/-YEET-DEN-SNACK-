@@ -28,6 +28,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local SnackTypes = require(ReplicatedStorage.Shared.SnackTypes)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local MeshVisuals = require(ReplicatedStorage.Shared.MeshVisuals)
 
 local BaseService = {}
 
@@ -282,6 +283,11 @@ local function buildBase(index: number, slot: CFrame)
 	vault.CFrame = slot * CFrame.new(0, 4.5, 14)
 	vault.Color = Color3.fromRGB(80, 80, 90)
 	vault.Material = Enum.Material.DiamondPlate
+	-- ══ MESH-EINBAU: echte Tresor-MeshId in src/shared/Config.luau eintragen ══
+	-- (Config.Meshes.Vault, oben in der Datei). Rein kosmetisch: Name, Größe,
+	-- Position und die komplette Tresor-Logik (Prompts, Zone, Knacken) bleiben
+	-- unverändert – nur die Optik des 7x7x7-Blocks wird ersetzt.
+	MeshVisuals.Apply(vault, Config.Meshes.Vault)
 	vault.Parent = folder
 
 	-- Unsichtbare Fang-Zone über der ganzen Basis

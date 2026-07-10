@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local SnackTypes = require(ReplicatedStorage.Shared.SnackTypes)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local MeshVisuals = require(ReplicatedStorage.Shared.MeshVisuals)
 
 local SnackService = {}
 
@@ -259,6 +260,12 @@ function SnackService.SpawnSnack(def, position: Vector3, velocity: Vector3?, noB
 	part.CanCollide = true
 	part:SetAttribute("SnackName", def.Name)
 	part:SetAttribute("Rarity", def.Rarity)
+
+	-- ══ MESH-EINBAU: echte Snack-MeshIds in src/shared/SnackTypes.luau eintragen ══
+	-- (SnackTypes.Meshes, oben in der Datei – ein Slot pro Snack-Name).
+	-- Ist dort eine echte MeshId gesetzt, überlagert sie den simplen Block;
+	-- Größe/Kollision/Welds laufen weiter über def.Size, nichts ändert sich an der Logik.
+	MeshVisuals.Apply(part, SnackTypes.Meshes[def.Name])
 
 	-- Schwebender Name über dem Snack
 	local billboard = Instance.new("BillboardGui")

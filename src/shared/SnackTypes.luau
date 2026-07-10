@@ -24,6 +24,45 @@ SnackTypes.RarityColors = {
 -- Raritäts-Reihenfolge für die Merge-Station (Merge-Ergebnis = eine Stufe höher)
 SnackTypes.RarityOrder = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Secret" }
 
+-- ══ Snack-Meshes: HIER echte MeshIds aus der Toolbox eintragen! ══
+-- Ein Eintrag pro Snack (Schlüssel = Snack-Name aus List/SupremeList unten).
+-- Solange "rbxassetid://0" (Platzhalter) drinsteht, bleibt der Snack der
+-- bisherige einfache Block in Raritäts-Farbe – Spiel läuft auch ohne Meshes.
+-- TextureId leer lassen -> Mesh übernimmt die Snack-Farbe (Color unten).
+-- MeshScale = Faktor auf die Original-Größe des Meshes; im Spiel testen und
+-- anpassen, bis das Mesh zur Kollisions-Größe (Size unten) passt.
+-- Angewendet wird das in SnackService.SpawnSnack (src/server/Services/SnackService.luau).
+SnackTypes.Meshes = {
+	-- Common
+	["Keks-Krümel"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Gummibär"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Salz-Brezel"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Popcorn-Knäuel"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Uncommon
+	["Schoko-Taler"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Saure Schlange"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Rare
+	["KitKat Klassik"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Waffel-Sandwich"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Epic
+	["Riesen-Donut"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Regenbogen-Lutscher"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Legendary
+	["Goldener KitKat"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Croissant-Komet"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Mythic
+	["Der Verbotene Riegel"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Uralte Zimtschnecke"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Secret
+	["El Cacao Supremo"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Das Letzte Gummibärchen"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	-- Supreme (nur vom Mutanten-Express)
+	["Radioaktiver Gummibär"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Atomarer KitKat"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Glibber-Donut aus Dimension X"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+	["Strahlende Zuckerstange"] = { MeshId = "rbxassetid://0", TextureId = "", MeshScale = Vector3.one },
+}
+
 SnackTypes.List = {
 	{
 		Name = "Keks-Krümel",
