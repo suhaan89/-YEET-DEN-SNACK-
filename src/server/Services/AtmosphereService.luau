@@ -38,34 +38,34 @@ end
 -- ══════════ Lighting & Post-Effects ══════════
 
 local function setupLighting()
-	-- Leichter, warmer Dunst: gibt der Map Tiefe, ohne die Sicht zu fressen
+	-- Leichter, luftiger Sommerdunst: Tiefe am Horizont, aber die Map (~660 Studs) bleibt gut einsehbar
 	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.3
+	atmosphere.Density = 0.24
 	atmosphere.Offset = 0.25
-	atmosphere.Color = Color3.fromRGB(215, 200, 190)
-	atmosphere.Decay = Color3.fromRGB(120, 100, 130)
-	atmosphere.Glare = 0.2
-	atmosphere.Haze = 1.6
+	atmosphere.Color = Color3.fromRGB(235, 225, 235)
+	atmosphere.Decay = Color3.fromRGB(160, 190, 230)
+	atmosphere.Glare = 0.25
+	atmosphere.Haze = 1.35
 	atmosphere.Parent = Lighting
 
 	-- Neon-Teile (Schilder, Trails, Deko) bekommen ein sattes Glühen
 	local bloom = Instance.new("BloomEffect")
-	bloom.Intensity = 0.5
-	bloom.Size = 28
-	bloom.Threshold = 1.05
+	bloom.Intensity = 0.9
+	bloom.Size = 26
+	bloom.Threshold = 0.85
 	bloom.Parent = Lighting
 
 	local sunRays = Instance.new("SunRaysEffect")
-	sunRays.Intensity = 0.08
-	sunRays.Spread = 0.6
+	sunRays.Intensity = 0.15
+	sunRays.Spread = 0.65
 	sunRays.Parent = Lighting
 
-	-- Candy-Look: etwas mehr Sättigung + Kontrast, minimal warm getönt
+	-- Candy-Look: satte Sättigung + Kontrast, warm getönt (aber Hauttöne/UI clippen nicht)
 	local color = Instance.new("ColorCorrectionEffect")
-	color.Saturation = 0.14
-	color.Contrast = 0.06
-	color.Brightness = 0.01
-	color.TintColor = Color3.fromRGB(255, 250, 244)
+	color.Saturation = 0.3
+	color.Contrast = 0.1
+	color.Brightness = 0.02
+	color.TintColor = Color3.fromRGB(255, 248, 240)
 	color.Parent = Lighting
 
 	-- Ein paar gemütliche Wolken am Himmel

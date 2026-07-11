@@ -88,6 +88,37 @@ alle stürzen sich drauf, und heimgetragen wird nichts – heimge**YEETet** wird
    (`Config.GemTrails`/`GemSkins`, nicht mit Cash kaufbar) und der exklusive
    **Juwelensturm-Trail** für alle 8 Parcours unter der Meister-Zeit
    (`MasterTime` pro Parcours).
+24. 📱 **Mobile-Steuerung**: Alle Interaktionen laufen über ProximityPrompts
+   (auf Touch automatisch Tipp-Buttons); YEET (Press-and-Hold mit identischer
+   Sweet-Spot-Logik) und SLAP haben große Touch-Buttons neben dem Sprung-Knopf.
+   Das komplette UI skaliert per UIScale auf Handy-/Tablet-Auflösungen runter.
+25. 💳 **Robux-Shop** (MonetizationService, 🛍️-Button): 4 Developer Products
+   (`Config.Monetization.Products`: 2x-Cash-Boost 30 Min mit Rejoin-sicherem
+   Ablauf-Timestamp, Tresor-Sofortverkauf, +10 permanente Tresor-Plätze,
+   Gold-Ei-Bundle) + **VIP-Gamepass** (+10 % Einkommen, 👑-Nametag,
+   VIP-Lounge auf der Map mit Türsteher). `ProcessReceipt` ist idempotent
+   (Receipt-DataStore quittiert jede PurchaseId genau einmal).
+26. 🎟️ **Promo-Codes** (PromoCodeService): Gutschein-Codes aus
+   `Config.PromoCodes` (Cash/Ei/Juwelen/Trail), pro Account einmal einlösbar,
+   Eingabe im 👥-Menü. Neue Codes = neue Config-Zeile, kein Code-Deploy.
+   GETRENNT vom Referral-System!
+27. 🏆 **Globale Bestenlisten** (LeaderboardService, OrderedDataStores):
+   Top 20 nach Lifetime-Cash (AddCash-Wrapper trackt alles jemals Verdiente –
+   Rebirths kosten keinen Rang!) und nach Rebirths. Zwei Leucht-Tafeln am
+   Spawn + 🏆-Panel im UI. DataStore-schonend: Upload alle 2 Min, Download
+   alle 90 Sek, UI liest nur den Server-Cache.
+28. 📅 **Täglicher Login-Streak** (DailyRewardService): 7-Tage-Zyklus
+   (`Config.DailyRewards`, Tag 7 = Gold-Ei), UTC-Kalendertage, verpasster Tag
+   resettet auf Tag 1. Popup beim ersten Join des Tages + 📅-Button.
+   Design-Entscheidung: Nach Tag 7 startet der ZYKLUS neu (für 8- bis
+   13-Jährige verständlicher als Endlos-Tabellen, Balancing bleibt planbar) –
+   der Streak-ZÄHLER läuft zum Angeben weiter.
+29. 🏷️ **Gruppen-Bonus** (GroupBonusService): Mitglieder der Roblox-Gruppe
+   (`Config.GroupId`) kriegen +10 % Tresor-Einkommen; Beitritt während der
+   Session wird per Recheck erkannt. Schläft komplett, solange GroupId = 0.
+30. 🔒 **Private-Server-tauglich**: Keine Logik hängt an "8 öffentliche
+   Spieler" (Basen sind Claim-basiert, alle Loops iterieren die echte
+   Spielerliste); der Server-Besitzer wird beim Join begrüßt.
 
 ## Entwicklung
 
@@ -138,6 +169,14 @@ src/server/   → ServerScriptService.Server
   Services/ParkourService  Portal-Hub, Teleports, Zeitmessung, Belohnungen,
                            Hindernis-Animationen, Portal-Leaderboards
   Modules/ParkourMap.luau  Baut die 8 Parkour-Arenen (Cursor-Segment-System)
+  Services/MonetizationService  Robux: Developer Products (idempotentes
+                           ProcessReceipt + Receipt-DataStore), VIP-Gamepass,
+                           VIP-Lounge, Boost-/Bonus-Einkommens-Tick
+  Services/PromoCodeService  Promo-Codes aus Config (1x pro Account)
+  Services/LeaderboardService  Globale Top-20 (OrderedDataStores, Lifetime-
+                           Cash via AddCash-Wrapper), Map-Tafeln + UI-Cache
+  Services/DailyRewardService  Login-Streak (7-Tage-Zyklus, UTC-Tage)
+  Services/GroupBonusService  Gruppen-Bonus (+10% für Gruppen-Mitglieder)
   Services/DebugService    Admin-/Test-Menü (Studio, Spiel-Besitzer, Whitelist)
 
 src/client/   → StarterPlayerScripts
@@ -173,3 +212,21 @@ src/client/   → StarterPlayerScripts
    „Parkour: alle 8 freischalten“ + „Cooldowns resetten“) und bei zu
    harten/leichten Stellen Zeiten/Belohnungen in `Config.ParkourCourses`
    bzw. Layouts in `Modules/ParkourMap.luau` nachjustieren.
+9. **Developer Products anlegen** (Creator Dashboard -> Spiel -> Monetarisierung
+   -> Developer-Produkte): vier Produkte erstellen (2x-Boost, Tresor-Verkauf,
+   Extra-Plätze, Gold-Ei-Bundle) und die Ids in
+   `Config.Monetization.Products[*].ProductId` eintragen (solange 0:
+   Kauf-Button zeigt nur „BALD!“).
+10. **VIP-Gamepass anlegen** und die Id in `Config.Monetization.VipGamepassId`
+   eintragen (solange 0: nur Hinweis-Toast, VIP-Lounge bleibt zu).
+11. **Roblox-Gruppe erstellen** (falls gewünscht) und die Id in
+   `Config.GroupId` eintragen – vorher schläft der Gruppen-Bonus komplett.
+   Gruppe auf der Spielseite verlinken!
+12. **Mobile testen**: Studio -> Device-Emulator, je einmal Phone- und
+   Tablet-Auflösung: YEET-/SLAP-Touch-Buttons, ProximityPrompt-Tipp-Buttons,
+   UI-Skalierung (Fenster müssen komplett sichtbar sein).
+13. **Private Server** (optional) im Creator Dashboard aktivieren (z. B.
+   kostenlos oder für Robux) – der Code ist dafür schon tauglich.
+14. **Promo-Codes**: Die Beispiel-Codes in `Config.PromoCodes`
+   (YEETDENSNACK/SCHOKOLADE/RELEASE) vor Release prüfen/ändern –
+   sie sind ab dem ersten Publish sofort einlösbar.

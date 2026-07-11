@@ -15,6 +15,7 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("Shared")
@@ -1103,8 +1104,12 @@ end
 function Ui.SetHoldHint(visible: boolean, snackName: string?)
 	holdHint.Visible = visible
 	if visible then
-		holdHint.Text = ("🍫 %s – Klick HALTEN & loslassen zum YEETEN! (%ds Zeit!)"):format(
+		local action = if UserInputService.TouchEnabled
+			then "YEET-Button HALTEN & loslassen"
+			else "Klick HALTEN & loslassen"
+		holdHint.Text = ("🍫 %s – %s zum YEETEN! (%ds Zeit!)"):format(
 			snackName or "Snack",
+			action,
 			Config.HoldDuration
 		)
 	end
@@ -1348,6 +1353,40 @@ local function buildFriendBonus()
 	refresh()
 end
 
+-- ══════════ Gruppen-Bonus-Anzeige ══════════
+-- Badge unter dem Freundes-Bonus, solange man Gruppen-Mitglied ist
+-- (Datenquelle: "InGroup"-Attribut, setzt der GroupBonusService).
+
+local function buildGroupBonus()
+	local frame = Instance.new("Frame")
+	frame.Name = "GroupBonus"
+	frame.Position = UDim2.new(0, 12, 0, 194) -- unter FriendBonus (y=158, Höhe 30)
+	frame.Size = UDim2.fromOffset(190, 30)
+	frame.BackgroundColor3 = Color3.fromRGB(55, 45, 30)
+	frame.BackgroundTransparency = 0.25
+	frame.Visible = false
+	roundify(frame, 10)
+	frame.Parent = gui
+
+	local label = makeLabel(frame, {
+		Size = UDim2.new(1, -12, 1, -6),
+		Position = UDim2.fromOffset(6, 3),
+		Text = "",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 210, 130),
+	})
+
+	local function refresh()
+		local active = player:GetAttribute("InGroup") == true
+		frame.Visible = active
+		if active then
+			label.Text = ("🏷️ Gruppen-Bonus: +%d%%"):format(Config.GroupBonusPercent * 100)
+		end
+	end
+	player:GetAttributeChangedSignal("InGroup"):Connect(refresh)
+	refresh()
+end
+
 -- ══════════ Debug-Menü (nur Entwickler) ══════════
 -- Erscheint nur, wenn der Server das "IsDev"-Attribut setzt (Studio/Whitelist).
 -- Tabs (Spieler/Events/Diagnose/Server), Suchfeld, Ziel-Auswahl und F4-Toggle.
@@ -1364,8 +1403,6 @@ local function buildDebugMenu()
 	end
 	debugBuilt = true
 
-	local UserInputService = game:GetService("UserInputService")
-	local RunService = game:GetService("RunService")
 	local debugRemote = Remotes.Get("DebugCommand") :: RemoteFunction
 
 	-- Sichere Invoke-Hülle (Server prüft die Whitelist bei jedem Aufruf selbst)
@@ -2443,7 +2480,7 @@ local function buildReferral()
 	roundify(toggle, 12)
 	toggle.Parent = gui
 
-	local frame = makeWindow("👥 FREUNDE EINLADEN", Vector2.new(440, 330), Color3.fromRGB(120, 220, 240))
+	local frame = makeWindow("👥 FREUNDE & CODES", Vector2.new(440, 460), Color3.fromRGB(120, 220, 240))
 
 	makeLabel(frame, {
 		Position = UDim2.fromOffset(16, 44),
@@ -2513,6 +2550,71 @@ local function buildReferral()
 		TextSize = 14,
 		TextWrapped = true,
 	})
+
+	-- ── Promo-Codes (getrennt vom Referral-System!) ──
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 300),
+		Size = UDim2.new(1, -32, 0, 24),
+		Text = "🎟️ PROMO-CODE (von YouTube, TikTok & Co.)",
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = Color3.fromRGB(255, 200, 80),
+		TextScaled = false,
+		TextSize = 16,
+	})
+
+	local promoBox = Instance.new("TextBox")
+	promoBox.Position = UDim2.new(0, 16, 0, 330)
+	promoBox.Size = UDim2.new(1, -152, 0, 40)
+	promoBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	promoBox.Font = FONT
+	promoBox.TextSize = 18
+	promoBox.TextColor3 = Color3.new(1, 1, 1)
+	promoBox.PlaceholderText = "Code hier eintippen..."
+	promoBox.Text = ""
+	promoBox.ClearTextOnFocus = false
+	roundify(promoBox, 10)
+	promoBox.Parent = frame
+
+	local promoButton = Instance.new("TextButton")
+	promoButton.AnchorPoint = Vector2.new(1, 0)
+	promoButton.Position = UDim2.new(1, -16, 0, 330)
+	promoButton.Size = UDim2.fromOffset(112, 40)
+	promoButton.BackgroundColor3 = Color3.fromRGB(240, 160, 40)
+	promoButton.Font = FONT
+	promoButton.TextScaled = true
+	promoButton.Text = "EINLÖSEN"
+	promoButton.TextColor3 = Color3.new(1, 1, 1)
+	roundify(promoButton, 10)
+	promoButton.Parent = frame
+
+	makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 376),
+		Size = UDim2.new(1, -32, 0, 40),
+		Text = "Jeder Code geht nur EINMAL pro Account. Neue Codes gibt's bei Updates & auf unseren Kanälen!",
+		TextColor3 = Color3.fromRGB(190, 190, 200),
+		TextScaled = false,
+		TextSize = 13,
+		TextWrapped = true,
+	})
+
+	promoButton.Activated:Connect(function()
+		local code = promoBox.Text
+		if code:gsub("%s", "") == "" then
+			Ui.Toast("❌ Erst einen Code eintippen!")
+			return
+		end
+		task.spawn(function()
+			local ok, result = pcall(function()
+				return (Remotes.Get("RedeemPromoCode") :: RemoteFunction):InvokeServer(code)
+			end)
+			if ok and typeof(result) == "table" then
+				Ui.Toast((result.ok and "🎟️ " or "❌ ") .. result.msg)
+				if result.ok then
+					promoBox.Text = ""
+				end
+			end
+		end)
+	end)
 
 	local function refresh()
 		task.spawn(function()
@@ -2719,6 +2821,414 @@ local function buildHousing()
 	end)
 end
 
+-- ══════════ Täglicher Login-Streak ══════════
+-- Popup beim ersten Join des Tages (wenn abholbar) + 📅-Button unten links.
+-- Streak/Claim validiert komplett der DailyRewardService.
+
+local function buildDailyReward()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "DailyToggle"
+	toggle.AnchorPoint = Vector2.new(0, 1)
+	toggle.Position = UDim2.new(0, 12, 1, -60) -- über dem Debug-Button (falls sichtbar)
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(90, 160, 240)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "📅"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("📅 TÄGLICHE BELOHNUNG", Vector2.new(420, 430), Color3.fromRGB(140, 200, 255))
+
+	local streakLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 24),
+		Text = "",
+		TextColor3 = Color3.fromRGB(255, 220, 80),
+	})
+
+	-- 7 Tages-Zeilen
+	local rows: { { Row: Frame, Label: TextLabel } } = {}
+	for i, def in Config.DailyRewards do
+		local row = Instance.new("Frame")
+		row.Position = UDim2.new(0, 16, 0, 74 + (i - 1) * 38)
+		row.Size = UDim2.new(1, -32, 0, 32)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		roundify(row, 8)
+		row.Parent = frame
+		local label = makeLabel(row, {
+			Position = UDim2.fromOffset(10, 2),
+			Size = UDim2.new(1, -20, 1, -4),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = ("Tag %d:  %s"):format(i, def.Label),
+		})
+		rows[i] = { Row = row, Label = label }
+	end
+
+	local claimButton = Instance.new("TextButton")
+	claimButton.AnchorPoint = Vector2.new(0.5, 1)
+	claimButton.Position = UDim2.new(0.5, 0, 1, -12)
+	claimButton.Size = UDim2.new(1, -32, 0, 48)
+	claimButton.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+	claimButton.Font = FONT
+	claimButton.TextScaled = true
+	claimButton.Text = "🎁 ABHOLEN!"
+	claimButton.TextColor3 = Color3.new(1, 1, 1)
+	roundify(claimButton, 12)
+	claimButton.Parent = frame
+
+	local function refresh()
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return (Remotes.Get("GetDailyInfo") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(info) ~= "table" then
+				return
+			end
+			streakLabel.Text = if info.Streak > 0
+				then ("🔥 Dein Streak: %d Tag(e) am Stück!"):format(info.Streak)
+				else "Hol dir jeden Tag eine Belohnung ab!"
+			for i, refs in rows do
+				if info.CanClaim and i == info.NextIndex then
+					refs.Row.BackgroundColor3 = Color3.fromRGB(60, 90, 60)
+					refs.Label.TextColor3 = Color3.fromRGB(150, 255, 170)
+				else
+					refs.Row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+					refs.Label.TextColor3 = Color3.new(1, 1, 1)
+				end
+			end
+			if info.CanClaim then
+				claimButton.Text = "🎁 ABHOLEN!"
+				claimButton.BackgroundColor3 = Color3.fromRGB(70, 170, 90)
+				toggle.Text = "📅❗"
+			else
+				claimButton.Text = "✅ Heute schon abgeholt – bis morgen!"
+				claimButton.BackgroundColor3 = Color3.fromRGB(90, 90, 110)
+				toggle.Text = "📅"
+			end
+		end)
+	end
+
+	claimButton.Activated:Connect(function()
+		task.spawn(function()
+			local ok, result = pcall(function()
+				return (Remotes.Get("ClaimDailyReward") :: RemoteFunction):InvokeServer()
+			end)
+			if ok and typeof(result) == "table" then
+				Ui.Toast((result.ok and "🎁 " or "❌ ") .. result.msg)
+			end
+			refresh()
+		end)
+	end)
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+
+	-- Auto-Popup beim Join, wenn heute noch nicht abgeholt wurde
+	task.delay(4, function()
+		local ok, info = pcall(function()
+			return (Remotes.Get("GetDailyInfo") :: RemoteFunction):InvokeServer()
+		end)
+		if ok and typeof(info) == "table" and info.CanClaim then
+			frame.Visible = true
+			refresh()
+		elseif ok and typeof(info) == "table" then
+			refresh() -- Button-Ausrufezeichen korrekt setzen
+		end
+	end)
+end
+
+-- ══════════ Globale Bestenlisten ══════════
+-- Zeigt die vom Server gecachten Top-Listen (GetLeaderboards liest NUR den
+-- Server-Cache, kein DataStore-Hit). Eigener Eintrag wird hervorgehoben.
+
+local function buildLeaderboard()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "LeaderboardToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 324) -- unterster Button der rechten Leiste
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(220, 160, 60)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🏆"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🏆 GLOBALE BESTENLISTEN", Vector2.new(560, 480), Color3.fromRGB(255, 210, 60))
+
+	local function makeColumn(x: number, title: string, color: Color3): TextLabel
+		makeLabel(frame, {
+			Position = UDim2.new(x, 12, 0, 44),
+			Size = UDim2.new(0.5, -24, 0, 26),
+			Text = title,
+			TextColor3 = color,
+		})
+		local scroll = Instance.new("ScrollingFrame")
+		scroll.Position = UDim2.new(x, 12, 0, 76)
+		scroll.Size = UDim2.new(0.5, -24, 1, -88)
+		scroll.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+		scroll.BackgroundTransparency = 0.3
+		scroll.BorderSizePixel = 0
+		scroll.ScrollBarThickness = 6
+		scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		scroll.CanvasSize = UDim2.new()
+		roundify(scroll, 10)
+		scroll.Parent = frame
+		local body = Instance.new("TextLabel")
+		body.Position = UDim2.fromOffset(10, 8)
+		body.Size = UDim2.new(1, -20, 0, 0)
+		body.AutomaticSize = Enum.AutomaticSize.Y
+		body.BackgroundTransparency = 1
+		body.Font = FONT
+		body.TextSize = 16
+		body.TextColor3 = Color3.new(1, 1, 1)
+		body.TextXAlignment = Enum.TextXAlignment.Left
+		body.TextYAlignment = Enum.TextYAlignment.Top
+		body.TextWrapped = true
+		body.RichText = true
+		body.Text = "Lade..."
+		body.Parent = scroll
+		return body
+	end
+
+	local cashBody = makeColumn(0, "💰 REICHSTE (Lifetime)", Color3.fromRGB(255, 210, 60))
+	local rebirthBody = makeColumn(0.5, "🌟 MEISTE REBIRTHS", Color3.fromRGB(220, 120, 255))
+
+	local function renderList(body: TextLabel, list: any, suffix: string)
+		if typeof(list) ~= "table" or #list == 0 then
+			body.Text = "Noch keine Einträge –\nsei der Erste! 😎"
+			return
+		end
+		local lines = {}
+		for rank, entry in list do
+			local medal = if rank == 1 then "🥇" elseif rank == 2 then "🥈" elseif rank == 3 then "🥉" else rank .. "."
+			local line = ("%s %s – %s%s"):format(medal, tostring(entry.Name), formatNumber(tonumber(entry.Value) or 0), suffix)
+			if entry.UserId == player.UserId then
+				line = ('<font color="#FFD700">➤ %s</font>'):format(line)
+			end
+			table.insert(lines, line)
+		end
+		body.Text = table.concat(lines, "\n")
+	end
+
+	local function refresh()
+		task.spawn(function()
+			local ok, data = pcall(function()
+				return (Remotes.Get("GetLeaderboards") :: RemoteFunction):InvokeServer()
+			end)
+			if not ok or typeof(data) ~= "table" then
+				return
+			end
+			renderList(cashBody, data.Cash, "💰")
+			renderList(rebirthBody, data.Rebirths, "🌟")
+		end)
+	end
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refresh()
+		end
+	end)
+end
+
+-- ══════════ Robux-Shop ══════════
+-- Developer Products + VIP-Gamepass. Der Client PROMPTET nur den Kauf –
+-- Auszahlung/Validierung macht der MonetizationService (ProcessReceipt).
+-- Solange eine Id noch 0 ist (Platzhalter), gibt's statt Kauf einen Hinweis.
+
+local function buildRobuxShop()
+	local toggle = Instance.new("TextButton")
+	toggle.Name = "RobuxShopToggle"
+	toggle.AnchorPoint = Vector2.new(1, 0)
+	toggle.Position = UDim2.new(1, -12, 0, 272) -- unter Hilfe/Pass/Achievements/Referral/Housing
+	toggle.Size = UDim2.fromOffset(44, 44)
+	toggle.BackgroundColor3 = Color3.fromRGB(60, 180, 90)
+	toggle.Font = FONT
+	toggle.TextScaled = true
+	toggle.Text = "🛍️"
+	toggle.TextColor3 = Color3.new(1, 1, 1)
+	roundify(toggle, 12)
+	toggle.Parent = gui
+
+	local frame = makeWindow("🛍️ ROBUX-SHOP", Vector2.new(460, 470), Color3.fromRGB(120, 240, 150))
+
+	-- Boost-Status oben (zählt live runter, solange das Fenster offen ist)
+	local boostLabel = makeLabel(frame, {
+		Position = UDim2.fromOffset(16, 42),
+		Size = UDim2.new(1, -32, 0, 22),
+		Text = "",
+		TextColor3 = Color3.fromRGB(255, 220, 80),
+		TextScaled = false,
+		TextSize = 15,
+	})
+
+	local list = Instance.new("ScrollingFrame")
+	list.Position = UDim2.new(0, 12, 0, 70)
+	list.Size = UDim2.new(1, -24, 1, -82)
+	list.BackgroundTransparency = 1
+	list.BorderSizePixel = 0
+	list.ScrollBarThickness = 6
+	list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	list.CanvasSize = UDim2.new()
+	list.Parent = frame
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = list
+
+	-- Eine Kauf-Zeile (Produkt oder Gamepass)
+	local function makeBuyRow(order: number, name: string, desc: string, color: Color3, onBuy: () -> (), priceFetch: (() -> string?)?)
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, -8, 0, 58)
+		row.BackgroundColor3 = Color3.fromRGB(55, 48, 70)
+		row.LayoutOrder = order
+		roundify(row, 10)
+		row.Parent = list
+
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 4),
+			Size = UDim2.new(1, -140, 0, 26),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = name,
+			TextColor3 = color,
+		})
+		makeLabel(row, {
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -140, 0, 20),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Text = desc,
+			TextColor3 = Color3.fromRGB(190, 190, 200),
+			TextScaled = false,
+			TextSize = 13,
+			TextWrapped = true,
+		})
+
+		local button = Instance.new("TextButton")
+		button.AnchorPoint = Vector2.new(1, 0.5)
+		button.Position = UDim2.new(1, -8, 0.5, 0)
+		button.Size = UDim2.fromOffset(115, 42)
+		button.BackgroundColor3 = Color3.fromRGB(60, 180, 90)
+		button.Font = FONT
+		button.TextScaled = true
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.Text = "R$ …"
+		roundify(button, 10)
+		button.Parent = row
+		button.Activated:Connect(onBuy)
+
+		-- Preis asynchron nachladen (Marketplace-API kann zicken -> Fallback)
+		task.spawn(function()
+			local text = priceFetch and priceFetch() or nil
+			if button.Parent then
+				button.Text = text or "KAUFEN"
+			end
+		end)
+		return button
+	end
+
+	-- ── VIP-Gamepass ──
+	local vipButton = makeBuyRow(
+		1,
+		"👑 VIP-PASS",
+		("Für immer +%d%% Tresor-Einkommen, 👑-Nametag & Zugang zur VIP-LOUNGE!"):format(
+			Config.Monetization.VipCashBonusPercent * 100
+		),
+		Color3.fromRGB(255, 215, 0),
+		function()
+			if player:GetAttribute("IsVip") == true then
+				Ui.Toast("👑 Du BIST schon VIP!")
+				return
+			end
+			if Config.Monetization.VipGamepassId <= 0 then
+				Ui.Toast("⚠️ VIP-Pass kommt bald! (Gamepass noch nicht eingerichtet)")
+				return
+			end
+			MarketplaceService:PromptGamePassPurchase(player, Config.Monetization.VipGamepassId)
+		end,
+		function(): string?
+			if Config.Monetization.VipGamepassId <= 0 then
+				return "BALD!"
+			end
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(Config.Monetization.VipGamepassId, Enum.InfoType.GamePass)
+			end)
+			if ok and info and info.PriceInRobux then
+				return ("R$ %d"):format(info.PriceInRobux)
+			end
+			return nil
+		end
+	)
+
+	-- ── Developer Products ──
+	for i, def in Config.Monetization.Products do
+		makeBuyRow(1 + i, def.Name, def.Desc, Color3.new(1, 1, 1), function()
+			if def.ProductId <= 0 then
+				Ui.Toast("⚠️ Kommt bald! (Produkt noch nicht eingerichtet)")
+				return
+			end
+			MarketplaceService:PromptProductPurchase(player, def.ProductId)
+		end, function(): string?
+			if def.ProductId <= 0 then
+				return "BALD!"
+			end
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfo(def.ProductId, Enum.InfoType.Product)
+			end)
+			if ok and info and info.PriceInRobux then
+				return ("R$ %d"):format(info.PriceInRobux)
+			end
+			return nil
+		end)
+	end
+
+	local function refreshBoostLabel()
+		local until_ = player:GetAttribute("BoostUntil")
+		local now = DateTime.now().UnixTimestamp
+		if typeof(until_) == "number" and until_ > now then
+			local left = until_ - now
+			boostLabel.Text = ("⚡ 2x-Boost AKTIV – noch %d:%02d Minuten!"):format(left // 60, left % 60)
+		elseif player:GetAttribute("IsVip") == true then
+			boostLabel.Text = "👑 VIP aktiv – danke für deinen Support!"
+		else
+			boostLabel.Text = "Unterstütze das Spiel und hol dir fette Vorteile! 💚"
+		end
+	end
+
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			if frame.Visible then
+				refreshBoostLabel()
+			end
+		end
+	end)
+	player:GetAttributeChangedSignal("IsVip"):Connect(function()
+		if player:GetAttribute("IsVip") == true then
+			vipButton.Text = "✓ AKTIV"
+			vipButton.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+		end
+	end)
+
+	toggle.Activated:Connect(function()
+		frame.Visible = not frame.Visible
+		if frame.Visible then
+			refreshBoostLabel()
+			if player:GetAttribute("IsVip") == true then
+				vipButton.Text = "✓ AKTIV"
+				vipButton.BackgroundColor3 = Color3.fromRGB(90, 120, 220)
+			end
+		end
+	end)
+end
+
 -- ══════════ Hilfe-Panel ══════════
 
 local function buildHelp()
@@ -2773,7 +3283,11 @@ local function buildHelp()
 		"🏆 ACHIEVEMENTS (Pokal-Button): Meilensteine sammeln!",
 		"🤝 Mit Roblox-FREUNDEN im Server spielen = +10% Einkommen!",
 		"👥 FREUNDE EINLADEN (Button rechts): Code teilen = fette Belohnung!",
+		"🎟️ PROMO-CODES gibt's im selben Menü – von YouTube, TikTok & Co.!",
 		"🏡 BASIS-DEKO (Button rechts): Deko kaufen & aufstellen!",
+		"📅 TÄGLICH einloggen = Streak-Belohnungen (Button unten links)!",
+		"🏆 GLOBALE BESTENLISTEN: Tafeln am Spawn + Pokal-Button rechts!",
+		"👑 VIP & Boosts gibt's im 🛍️ ROBUX-SHOP (Button rechts)!",
 	}, "\n")
 
 	local body = Instance.new("TextLabel")
@@ -2802,6 +3316,30 @@ function Ui.Build()
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = false
 	gui.Parent = player:WaitForChild("PlayerGui")
+
+	-- Responsive Skalierung: das ganze UI ist mit Pixel-Offsets für ~1280x720
+	-- gebaut. Auf kleineren Screens (Handy/Tablet) schrumpft eine UIScale
+	-- alles proportional mit, damit Fenster wie der 540er-Season-Pass nicht
+	-- über den Rand laufen. Untergrenze 0.55, sonst wird Text unlesbar.
+	local uiScale = Instance.new("UIScale")
+	uiScale.Parent = gui
+	local function refreshScale()
+		local camera = workspace.CurrentCamera
+		if not camera then
+			return
+		end
+		local vp = camera.ViewportSize
+		uiScale.Scale = math.clamp(math.min(vp.X / 1280, vp.Y / 720), 0.55, 1)
+	end
+	task.spawn(function()
+		local camera = workspace.CurrentCamera
+		while not camera do
+			task.wait(0.2)
+			camera = workspace.CurrentCamera
+		end
+		camera:GetPropertyChangedSignal("ViewportSize"):Connect(refreshScale)
+		refreshScale()
+	end)
 
 	-- Banner
 	announceLabel = makeLabel(gui, {
@@ -2879,12 +3417,16 @@ function Ui.Build()
 	buildMergeUi()
 	buildSupremeBar()
 	buildFriendBonus()
+	buildGroupBonus()
 	buildChargeBar()
 	buildParkourHud()
 	buildSeasonPass()
 	buildAchievements()
 	buildReferral()
 	buildHousing()
+	buildRobuxShop()
+	buildLeaderboard()
+	buildDailyReward()
 	buildHelp()
 
 	-- Debug-Menü nur zeigen, wenn der Server uns als Entwickler markiert

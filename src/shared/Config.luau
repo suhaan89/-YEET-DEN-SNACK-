@@ -119,6 +119,13 @@ local Config = {
 	-- Spawn-Rechteck: deckt Plaza + Straße + Wiese ab, spart Basen (z=±120) und Shops (z=±80) aus
 	GoldenSnackArea = { MinX = -200, MaxX = 200, MinZ = -60, MaxZ = 60 },
 
+	-- ══ Gruppen-Bonus ══
+	-- Mitglieder der Roblox-Gruppe kriegen dauerhaft +X% Tresor-Einkommen.
+	-- GroupId 0 = noch keine Gruppe angelegt -> Feature schläft komplett.
+	GroupId = 0, -- TODO: Roblox-Gruppe erstellen und Id hier eintragen!
+	GroupBonusPercent = 0.1, -- +10% aufs rohe Tresor-Einkommen für Mitglieder
+	GroupRecheckInterval = 120, -- Sekunden: Nicht-Mitglieder erneut prüfen (Beitritt während der Session)
+
 	-- ══ Freunde-Bonus ══
 	-- Spielt ein Roblox-Freund gleichzeitig im selben Server, bekommen BEIDE
 	-- einen passiven Einkommens-Boost aufs rohe Tresor-Einkommen (FriendService).
@@ -530,6 +537,88 @@ local Config = {
 		{ Id = "Kristall", Name = "💎 Kristall-Körper", GemCost = 120, Color = Color3.fromRGB(150, 225, 255), Material = Enum.Material.Glass, Transparency = 0.35, Desc = "Durchsichtig, glänzend, unbezahlbar (fast)." },
 	},
 
+	-- ══ Täglicher Login-Streak ══
+	-- 7-Tage-Zyklus: Tag 1-7, danach geht's wieder bei Tag 1 los (der
+	-- Streak-Zähler läuft zum Angeben weiter). Ein verpasster Tag (UTC)
+	-- resettet den Streak auf Tag 1. Belohnungs-Typen wie bei PromoCodes.
+	DailyRewards = {
+		{ Type = "Cash", Amount = 500, Label = "💰 500 Cash" },
+		{ Type = "Cash", Amount = 1200, Label = "💰 1.2k Cash" },
+		{ Type = "Egg", Egg = "Basic", Label = "🥚 Snack-Ei" },
+		{ Type = "Cash", Amount = 3000, Label = "💰 3k Cash" },
+		{ Type = "Gems", Amount = 5, Label = "💎 5 Juwelen" },
+		{ Type = "Cash", Amount = 6000, Label = "💰 6k Cash" },
+		{ Type = "Egg", Egg = "Golden", Label = "🌟 GOLD-EI!" },
+	},
+
+	-- ══ Globale Bestenlisten ══
+	-- Server-übergreifende Top-Listen über OrderedDataStores. Intervalle
+	-- bewusst träge (DataStore-Budget!): Schreiben alle 2 Min pro Spieler,
+	-- Lesen alle 90 Sek pro Board.
+	Leaderboard = {
+		CashStore = "YeetDenSnack_LB_LifetimeCash_v1",
+		RebirthStore = "YeetDenSnack_LB_Rebirths_v1",
+		TopCount = 20,
+		WriteInterval = 120, -- Sekunden zwischen zwei Score-Uploads
+		ReadInterval = 90, -- Sekunden zwischen zwei Top-Listen-Downloads
+	},
+
+	-- ══ Promo-Codes ══
+	-- Codes für YouTuber/TikTok-Shoutouts & Updates: einfach hier neue Zeilen
+	-- ergänzen (KEINE Code-Änderung nötig), alte per Active=false abschalten.
+	-- Jeder Account kann jeden Code nur EINMAL einlösen (im Profil gespeichert).
+	-- Reward-Typen: Cash {Amount}, Egg {Egg="Basic|Golden|Mutant|Juwel"},
+	-- Gems {Amount}, Trail {Trail="<Trail-Id>"}.
+	PromoCodes = {
+		{ Code = "YEETDENSNACK", Active = true, Reward = { Type = "Cash", Amount = 2500 } },
+		{ Code = "SCHOKOLADE", Active = true, Reward = { Type = "Egg", Egg = "Basic" } },
+		{ Code = "RELEASE", Active = true, Reward = { Type = "Egg", Egg = "Golden" } },
+	},
+
+	-- ══ Monetarisierung (Robux) ══
+	-- Developer Products (mehrfach kaufbar) + VIP-Gamepass. Alle Ids sind
+	-- PLATZHALTER (0), bis sie im Creator Dashboard angelegt sind – solange
+	-- eine Id 0 ist, zeigt der Kauf-Button nur einen Hinweis-Toast.
+	-- Quittierte Käufe (PurchaseId) landen im Receipt-DataStore, damit
+	-- ProcessReceipt garantiert nur EINMAL auszahlt.
+	Monetization = {
+		ReceiptDataStore = "YeetDenSnack_Receipts_v1",
+		VipGamepassId = 0, -- TODO: VIP-Gamepass im Creator Dashboard anlegen!
+		VipCashBonusPercent = 0.1, -- dauerhafter Bonus aufs rohe Tresor-Einkommen
+		BoostBonusPercent = 1, -- "2x Cash" = +100% Tresor-Einkommen solange aktiv
+		Products = {
+			{
+				Id = "Boost2x",
+				Name = "⚡ 2x Tresor-Cash (30 Min)",
+				Desc = "Doppeltes Tresor-Einkommen für 30 Minuten – übersteht sogar Rejoins!",
+				ProductId = 0, -- TODO: Developer Product anlegen und Id eintragen!
+				DurationSeconds = 1800,
+			},
+			{
+				Id = "VaultSell",
+				Name = "💸 Tresor-Sofortverkauf",
+				Desc = "Verkauft ALLE Tresor-Snacks sofort (Wert: 120 Sekunden Einkommen pro Snack).",
+				ProductId = 0,
+				SellSecondsWorth = 120,
+			},
+			{
+				Id = "VaultSlots",
+				Name = "🧰 +10 Tresor-Plätze (für immer)",
+				Desc = "Dauerhaft 10 zusätzliche Tresor-Plätze – überlebt sogar Rebirths!",
+				ProductId = 0,
+				Slots = 10,
+			},
+			{
+				Id = "EggBundle",
+				Name = "🥚 Gold-Ei-Bundle (3 Stück)",
+				Desc = "Drei Gold-Eier, sofort geöffnet – drück die Daumen!",
+				ProductId = 0,
+				Egg = "Golden",
+				Count = 3,
+			},
+		},
+	},
+
 	-- ══ Debug/Test-Menü ══
 	-- Im Studio ist das Menü IMMER sichtbar. Für Team Test/Live-Server hier UserIds eintragen:
 	DebugUserIds = {
@@ -556,11 +645,19 @@ function Config.BaseLevelDef(level: number)
 	return Config.BaseLevels[math.clamp(level, 1, #Config.BaseLevels)]
 end
 
--- Maximale Tresor-Plätze bei `rebirths` Rebirths und Basis-Level `baseLevel`
-function Config.VaultLimit(rebirths: number, baseLevel: number?): number
+-- Maximale Tresor-Plätze bei `rebirths` Rebirths und Basis-Level `baseLevel`.
+-- `extraSlots` = dauerhaft gekaufte Zusatz-Plätze (Robux-Shop, überlebt Rebirths).
+function Config.VaultLimit(rebirths: number, baseLevel: number?, extraSlots: number?): number
 	return Config.VaultLimitBase
 		+ rebirths * Config.VaultLimitPerRebirth
 		+ Config.BaseLevelDef(baseLevel or 1).BonusSlots
+		+ (extraSlots or 0)
+end
+
+-- Produkt-Lookup nach interner Id bzw. nach Roblox-ProductId
+Config.MonetizationProductsById = {} :: { [string]: any }
+for _, def in Config.Monetization.Products do
+	Config.MonetizationProductsById[def.Id] = def
 end
 
 -- Erfolgschance für einen Merge mit `count` gleichen Snacks (Client-Anzeige + Server-Wurf
